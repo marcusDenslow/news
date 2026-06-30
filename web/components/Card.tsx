@@ -32,6 +32,7 @@ export function Card({ entry, index, onOpen, onToggleStar }: CardProps) {
     <motion.article
       className={`card ${hasImage ? "card--image" : "card--text"}`}
       data-read={entry.status === "read"}
+      data-initial={(entry.feedTitle || "•").slice(0, 1).toUpperCase()}
       style={{ "--feed": feedColor(entry.feedId) } as React.CSSProperties}
       initial={{ opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}

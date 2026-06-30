@@ -3,6 +3,8 @@
 import { Loader2, Inbox, AlertCircle, Check } from "lucide-react";
 import type { CardEntry, Filter } from "@/lib/types";
 import { Card, Hero } from "@/components/Card";
+import { MediaImg } from "@/components/Img";
+import { feedColor, relativeTime } from "@/lib/format";
 
 interface StreamProps {
   entries: CardEntry[];
@@ -20,20 +22,17 @@ interface StreamProps {
 }
 
 function masthead(filter: Filter, search: string) {
-  if (search.trim()) {
-    return { eyebrow: "SEARCH", title: `“${search.trim()}”` };
-  }
+  if (search.trim()) return { eyebrow: "Search", title: `“${search.trim()}”` };
   if (filter.kind === "today") {
-    // Pinned locale keeps server/client formatting identical (avoids hydration mismatch).
     const d = new Date().toLocaleDateString("en-US", {
       weekday: "long",
       month: "long",
       day: "numeric",
     });
-    return { eyebrow: d.toUpperCase(), title: "Today" };
+    return { eyebrow: d, title: "Today" };
   }
   const eyebrows: Record<string, string> = {
-    unread: "Latest",
+    unread: "Unread",
     starred: "Saved",
     category: "Channel",
     feed: "Channel",
@@ -41,18 +40,68 @@ function masthead(filter: Filter, search: string) {
   return { eyebrow: eyebrows[filter.kind] ?? "", title: filter.label };
 }
 
+function Brief({ entry, onOpen }: { entry: CardEntry; onOpen: (e: CardEntry) => void }) {
+  const open = () => onOpen(entry);
+  return (
+    <div
+      className="brief"
+      style={{ "--feed": feedColor(entry.feedId) } as React.CSSProperties}
+      data-read={entry.status === "read"}
+      role="button"
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        }
+      }}
+    >
+      <div className="brief__body">
+        <div className="brief__source">{entry.feedTitle}</div>
+        <div className="brief__title line-clamp-3">{entry.title}</div>
+        <div className="brief__meta">
+          {relativeTime(entry.publishedAt)}
+          {entry.readingTime > 0 && ` · ${entry.readingTime} min`}
+        </div>
+      </div>
+      {entry.image && (
+        <div className="brief__thumb">
+          <MediaImg src={entry.image} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SkeletonStream() {
   return (
     <>
-      <div className="skeleton-card" style={{ marginBottom: 22 }}>
-        <div className="shimmer" style={{ aspectRatio: "16 / 8", minHeight: 280 }} />
+      <div className="frontpage">
+        <div className="skeleton-card" style={{ padding: 0 }}>
+          <div className="shimmer" style={{ aspectRatio: "16 / 10", minHeight: 360 }} />
+        </div>
+        <div className="skeleton-card">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={{ display: "flex", gap: 13, padding: "13px 8px" }}>
+              <div style={{ flex: 1 }}>
+                <div className="shimmer" style={{ height: 10, width: "35%", borderRadius: 5, marginBottom: 10 }} />
+                <div className="shimmer" style={{ height: 14, width: "94%", borderRadius: 5, marginBottom: 7 }} />
+                <div className="shimmer" style={{ height: 14, width: "60%", borderRadius: 5 }} />
+              </div>
+              <div className="shimmer" style={{ width: 66, height: 66, borderRadius: 14, flexShrink: 0 }} />
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="masonry">
+      <div className="flow">
         {Array.from({ length: 9 }).map((_, i) => (
           <div key={i} className="skeleton-card">
-            {i % 3 !== 1 && <div className="shimmer" style={{ aspectRatio: "16 / 10" }} />}
-            <div style={{ padding: "14px 16px 18px" }}>
-              <div className="shimmer" style={{ height: 11, width: "40%", borderRadius: 5, marginBottom: 12 }} />
+            {i % 3 !== 1 && (
+              <div className="shimmer" style={{ aspectRatio: "16 / 10", borderRadius: 16 }} />
+            )}
+            <div style={{ padding: "13px 8px 8px" }}>
+              <div className="shimmer" style={{ height: 11, width: "40%", borderRadius: 5, marginBottom: 11 }} />
               <div className="shimmer" style={{ height: 16, width: "92%", borderRadius: 5, marginBottom: 8 }} />
               <div className="shimmer" style={{ height: 16, width: "70%", borderRadius: 5, marginBottom: 14 }} />
               <div className="shimmer" style={{ height: 10, width: "30%", borderRadius: 5 }} />
@@ -79,7 +128,10 @@ export function Stream({
   sentinelRef,
 }: StreamProps) {
   const { eyebrow, title } = masthead(filter, search);
-  const [hero, ...rest] = entries;
+
+  const lead = entries[0];
+  const briefs = entries.slice(1, 5);
+  const flow = entries.slice(5);
 
   return (
     <div className="stream">
@@ -123,18 +175,34 @@ export function Stream({
         </div>
       ) : (
         <>
-          {hero && <Hero entry={hero} onOpen={onOpen} />}
-          <div className="masonry">
-            {rest.map((entry, i) => (
-              <Card
-                key={entry.id}
-                entry={entry}
-                index={i}
-                onOpen={onOpen}
-                onToggleStar={onToggleStar}
-              />
-            ))}
-          </div>
+          {briefs.length > 0 ? (
+            <div className="frontpage">
+              <Hero entry={lead} onOpen={onOpen} />
+              <div className="briefs">
+                <div className="briefs__head">
+                  <span className="briefs__pulse" />
+                  Latest
+                </div>
+                {briefs.map((e) => (
+                  <Brief key={e.id} entry={e} onOpen={onOpen} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            lead && (
+              <div style={{ marginBottom: 24 }}>
+                <Hero entry={lead} onOpen={onOpen} />
+              </div>
+            )
+          )}
+
+          {flow.length > 0 && (
+            <div className="flow">
+              {flow.map((entry, i) => (
+                <Card key={entry.id} entry={entry} index={i} onOpen={onOpen} onToggleStar={onToggleStar} />
+              ))}
+            </div>
+          )}
         </>
       )}
 

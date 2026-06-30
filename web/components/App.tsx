@@ -5,7 +5,7 @@ import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import { AnimatePresence } from "motion/react";
 import { toast } from "sonner";
-import type { CardEntry, Filter, FeedsTree } from "@/lib/types";
+import type { CardEntry, Filter, FeedsTree, FeedNode } from "@/lib/types";
 import { jsonFetcher } from "@/lib/format";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
@@ -183,6 +183,79 @@ export function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  const markRangeRead = useCallback(
+    (body: { feedId?: number; categoryId?: number }, predicate: (e: CardEntry) => boolean) => {
+      mutate(
+        (pages) =>
+          pages?.map((pg) => ({
+            ...pg,
+            entries: pg.entries.map((e) =>
+              predicate(e) ? { ...e, status: "read" as const } : e
+            ),
+          })),
+        { revalidate: false }
+      );
+      return fetch("/api/entries/mark-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    },
+    [mutate]
+  );
+
+  const markAllRead = useCallback(async () => {
+    const body: { feedId?: number; categoryId?: number } = {};
+    if (filter.kind === "feed" && filter.id) body.feedId = filter.id;
+    else if (filter.kind === "category" && filter.id) body.categoryId = filter.id;
+    try {
+      await markRangeRead(body, () => true);
+      toast.success("Marked all as read");
+    } catch {
+      toast.error("Couldn’t mark all read");
+    }
+    mutateTree();
+    if (filter.kind === "unread") mutate();
+  }, [filter, markRangeRead, mutate, mutateTree]);
+
+  const markFeedRead = useCallback(
+    async (feedId: number) => {
+      try {
+        await markRangeRead({ feedId }, (e) => e.feedId === feedId);
+        toast.success("Marked all as read");
+      } catch {
+        toast.error("Couldn’t mark all read");
+      }
+      mutateTree();
+    },
+    [markRangeRead, mutateTree]
+  );
+
+  const removeFeed = useCallback(
+    (feed: FeedNode) => {
+      toast(`Remove ${feed.title}?`, {
+        description: "You’ll stop receiving its stories.",
+        action: {
+          label: "Remove",
+          onClick: async () => {
+            try {
+              await fetch(`/api/feeds/${feed.id}`, { method: "DELETE" });
+              toast.success("Feed removed");
+              if (filter.kind === "feed" && filter.id === feed.id) {
+                setFilter({ kind: "today", label: "Today" });
+              }
+              mutateTree();
+              mutate();
+            } catch {
+              toast.error("Couldn’t remove feed");
+            }
+          },
+        },
+      });
+    },
+    [filter, mutate, mutateTree]
+  );
+
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -210,6 +283,8 @@ export function App() {
         onRefresh={refresh}
         refreshing={refreshing}
         onAddFeed={() => setAddOpen(true)}
+        onMarkFeedRead={markFeedRead}
+        onRemoveFeed={removeFeed}
       />
 
       <main className="main">
@@ -218,6 +293,8 @@ export function App() {
           onMenu={() => setSidebarOpen(true)}
           search={search}
           onSearch={setSearch}
+          showMarkAll={!search && filter.kind !== "starred"}
+          onMarkAllRead={markAllRead}
         />
         <Stream
           entries={entries}

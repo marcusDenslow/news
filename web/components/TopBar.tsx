@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Menu, Search, X } from "lucide-react";
+import { Menu, Search, X, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface TopBarProps {
@@ -9,9 +9,18 @@ interface TopBarProps {
   onMenu: () => void;
   search: string;
   onSearch: (q: string) => void;
+  showMarkAll: boolean;
+  onMarkAllRead: () => void;
 }
 
-export function TopBar({ title, onMenu, search, onSearch }: TopBarProps) {
+export function TopBar({
+  title,
+  onMenu,
+  search,
+  onSearch,
+  showMarkAll,
+  onMarkAllRead,
+}: TopBarProps) {
   const [value, setValue] = useState(search);
 
   // Keep local input in sync if the committed search is cleared elsewhere.
@@ -41,6 +50,13 @@ export function TopBar({ title, onMenu, search, onSearch }: TopBarProps) {
       <span className="topbar__section">{title}</span>
 
       <div className="topbar__spacer" />
+
+      {showMarkAll && (
+        <button type="button" className="markall-btn" onClick={onMarkAllRead}>
+          <CheckCheck className="size-4" />
+          <span>Mark all read</span>
+        </button>
+      )}
 
       <div className="topbar__search">
         <Search className="topbar__search-icon size-4" />

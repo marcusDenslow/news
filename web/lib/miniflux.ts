@@ -37,23 +37,67 @@ async function mf<T>(path: string, init?: RequestInit): Promise<T> {
 
 const IMG_EXT = /\.(jpe?g|png|webp|gif|avif|bmp|tiff?)(\?|#|$)/i;
 
-function pickImage(entry: RawEntry): string | null {
-  for (const enc of entry.enclosures ?? []) {
-    const url = enc.url ?? "";
-    if (!url) continue;
-    const mime = enc.mime_type ?? "";
-    if (mime.startsWith("image/")) return url;
-    if (IMG_EXT.test(url)) return url; // Miniflux often reports image/octet-stream
+// URLs whose params are signed (HMAC/token) must not be edited — doing so
+// invalidates the signature and the CDN rejects the request.
+const SIGNED_PARAMS = ["s", "sig", "signature", "hmac", "token", "st", "exp", "expires"];
+
+// Many feeds hand us a tiny thumbnail (e.g. ?width=140). For *unsigned* CDN URLs
+// we can request a larger render by bumping the width param.
+function boostImage(url: string): string {
+  // BBC ichef encodes width in the path (unsigned): /ace/standard/240/cpsprodpb/...
+  if (/ichef\.bbci\.co\.uk/.test(url)) {
+    return url.replace(/(\/(?:standard|ws|news|amz)\/)\d{2,4}(\/)/, "$1800$2");
   }
+  try {
+    const u = new URL(url);
+    if (SIGNED_PARAMS.some((k) => u.searchParams.has(k))) return url;
+    let touched = false;
+    for (const k of ["width", "w", "maxwidth", "fit-width"]) {
+      if (u.searchParams.has(k)) {
+        const cur = Number(u.searchParams.get(k));
+        if (!cur || cur < 1280) u.searchParams.set(k, "1280");
+        touched = true;
+      }
+    }
+    for (const k of ["height", "h", "resize"]) u.searchParams.delete(k);
+    if (touched && u.searchParams.has("quality")) u.searchParams.set("quality", "80");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+// Rough pixel-width hint so we can prefer the biggest signed render a feed offers.
+function widthHint(url: string): number {
+  const q = url.match(/[?&](?:width|w)=(\d{2,5})/i);
+  if (q) return Number(q[1]);
+  const wh = url.match(/\/(\d{3,5})x\d{3,5}\//);
+  if (wh) return Number(wh[1]);
+  const n = url.match(/\/(\d{3,5})\.(?:jpe?g|png|webp|avif)/i);
+  if (n) return Number(n[1]);
+  return 0;
+}
+
+function pickImage(entry: RawEntry): string | null {
+  const candidates = (entry.enclosures ?? []).filter((enc) => {
+    const url = enc.url ?? "";
+    const mime = enc.mime_type ?? "";
+    return Boolean(url) && (mime.startsWith("image/") || IMG_EXT.test(url));
+  });
+  if (candidates.length) {
+    // Prefer the largest render the feed already offers (each is validly signed).
+    candidates.sort((a, b) => widthHint(b.url) - widthHint(a.url));
+    return boostImage(candidates[0].url);
+  }
+
   const content = entry.content ?? "";
-  // Prefer the largest candidate in a srcset, else the first <img src>.
   const srcset = content.match(/<img[^>]+srcset=["']([^"']+)["']/i);
   if (srcset) {
     const last = srcset[1].split(",").map((s) => s.trim().split(/\s+/)[0]).filter(Boolean).pop();
-    if (last && /^https?:\/\//.test(last)) return last;
+    if (last && /^https?:\/\//.test(last)) return boostImage(last);
   }
   const m = content.match(/<img[^>]+src=["']([^"']+)["']/i);
-  if (m && /^https?:\/\//.test(m[1])) return m[1];
+  if (m && /^https?:\/\//.test(m[1])) return boostImage(m[1]);
   return null;
 }
 
@@ -74,8 +118,19 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
+// Strip link-dump boilerplate that some feeds (e.g. Hacker News) put in content.
+function cleanExcerpt(text: string): string {
+  return text
+    .replace(/Article URL:\s*\S+/gi, "")
+    .replace(/Comments URL:\s*\S+/gi, "")
+    .replace(/Points:\s*\d+/gi, "")
+    .replace(/#\s*Comments:\s*\d+/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function excerptOf(html: string, max = 240): string {
-  const text = htmlToText(html);
+  const text = cleanExcerpt(htmlToText(html));
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
   const lastSpace = cut.lastIndexOf(" ");
@@ -230,6 +285,28 @@ export async function getFeedsTree(): Promise<FeedsTree> {
   }
 
   return { totalUnread, starred, categories: cats };
+}
+
+export async function markAllRead(p: { feedId?: number; categoryId?: number }): Promise<void> {
+  if (p.feedId) {
+    await mf<void>(`/feeds/${p.feedId}/mark-all-as-read`, { method: "PUT" });
+    return;
+  }
+  if (p.categoryId) {
+    await mf<void>(`/categories/${p.categoryId}/mark-all-as-read`, { method: "PUT" });
+    return;
+  }
+  // Global: mark every category as read.
+  const cats = await mf<Category[]>("/categories");
+  await Promise.all(
+    cats.map((c) =>
+      mf<void>(`/categories/${c.id}/mark-all-as-read`, { method: "PUT" }).catch(() => {})
+    )
+  );
+}
+
+export async function deleteFeed(feedId: number): Promise<void> {
+  await mf<void>(`/feeds/${feedId}`, { method: "DELETE" });
 }
 
 export async function getIcon(feedId: number): Promise<{ mime: string; bytes: Buffer } | null> {

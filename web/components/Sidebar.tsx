@@ -6,18 +6,26 @@ import {
   Sparkles,
   CircleDot,
   Bookmark,
-  Folder,
   ChevronRight,
   Plus,
   RefreshCw,
   Sun,
   Moon,
   Newspaper,
+  MoreHorizontal,
+  CheckCheck,
+  Trash2,
 } from "lucide-react";
-import type { Filter, FeedsTree } from "@/lib/types";
+import type { Filter, FeedsTree, FeedNode } from "@/lib/types";
 import { Favicon } from "@/components/Img";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SidebarProps {
   tree?: FeedsTree;
@@ -28,6 +36,8 @@ interface SidebarProps {
   onRefresh: () => void;
   refreshing: boolean;
   onAddFeed: () => void;
+  onMarkFeedRead: (feedId: number) => void;
+  onRemoveFeed: (feed: FeedNode) => void;
 }
 
 function NavItem({
@@ -93,6 +103,8 @@ export function Sidebar({
   onRefresh,
   refreshing,
   onAddFeed,
+  onMarkFeedRead,
+  onRemoveFeed,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const toggle = (id: number) =>
@@ -181,15 +193,47 @@ export function Sidebar({
 
                 {!isCollapsed &&
                   cat.feeds.map((feed) => (
-                    <NavItem
+                    <div
                       key={feed.id}
-                      indent
-                      icon={<Favicon feedId={feed.id} className="nav-feedicon" />}
-                      label={feed.title}
-                      count={feed.unread}
-                      active={is("feed", feed.id)}
-                      onClick={() => pick({ kind: "feed", id: feed.id, label: feed.title })}
-                    />
+                      className="nav-item"
+                      data-active={is("feed", feed.id)}
+                      style={{ paddingLeft: 32 }}
+                    >
+                      <Favicon feedId={feed.id} className="nav-feedicon" />
+                      <span
+                        className="nav-item__label"
+                        style={{ cursor: "pointer" }}
+                        onClick={() => pick({ kind: "feed", id: feed.id, label: feed.title })}
+                      >
+                        {feed.title}
+                      </span>
+                      {feed.unread > 0 && <span className="nav-item__count">{feed.unread}</span>}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="nav-item__more"
+                            aria-label="Feed options"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-xl">
+                          <DropdownMenuItem onClick={() => onMarkFeedRead(feed.id)}>
+                            <CheckCheck className="size-4" />
+                            Mark all as read
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => onRemoveFeed(feed)}
+                          >
+                            <Trash2 className="size-4" />
+                            Remove feed
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   ))}
               </div>
             );
