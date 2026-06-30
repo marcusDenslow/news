@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
     const result = await createFeed(feedUrl, body.categoryId);
     return NextResponse.json(result);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 502 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 502 }
+    );
   }
 }

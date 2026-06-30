@@ -235,10 +235,40 @@ export async function createFeed(feedUrl: string, categoryId?: number): Promise<
     const cats = await mf<Category[]>("/categories");
     cat = cats[0]?.id ?? 1;
   }
-  return mf<{ feed_id: number }>("/feeds", {
-    method: "POST",
-    body: JSON.stringify({ feed_url: feedUrl, category_id: cat }),
-  });
+  const create = (url: string) =>
+    mf<{ feed_id: number }>("/feeds", {
+      method: "POST",
+      body: JSON.stringify({ feed_url: url, category_id: cat }),
+    });
+
+  const isDup = (e: unknown) => /already exists/i.test(String(e));
+
+  try {
+    // Works when the user pasted an actual feed URL.
+    return await create(feedUrl);
+  } catch (directErr) {
+    if (isDup(directErr)) throw new Error("You’re already subscribed to that feed.");
+
+    // Otherwise the URL is probably a site page — discover its feeds.
+    let found: Array<{ url: string; title?: string }> = [];
+    try {
+      found = await mf<Array<{ url: string; title?: string }>>("/discover", {
+        method: "POST",
+        body: JSON.stringify({ url: feedUrl }),
+      });
+    } catch {
+      /* discovery itself failed (unreachable host, etc.) */
+    }
+    if (found?.length) {
+      try {
+        return await create(found[0].url);
+      } catch (discoveredErr) {
+        if (isDup(discoveredErr)) throw new Error("You’re already subscribed to that feed.");
+        throw new Error("No RSS or Atom feed found at that address. Try the direct feed URL.");
+      }
+    }
+    throw new Error("No RSS or Atom feed found at that address. Try the direct feed URL.");
+  }
 }
 
 export async function getFeedsTree(): Promise<FeedsTree> {
