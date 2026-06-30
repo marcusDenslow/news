@@ -157,7 +157,22 @@ export function Sidebar({
             onClick={() => pick({ kind: "starred", label: "Bookmarks" })}
           />
 
-          <div className="sidebar__group-label">Channels</div>
+          <div className="sidebar__group-label sidebar__group-row">
+            <span>Channels</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="sidebar__add"
+                  onClick={onAddFeed}
+                  aria-label="Add feed"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Add feed</TooltipContent>
+            </Tooltip>
+          </div>
 
           {tree?.categories.map((cat) => {
             const isCollapsed = collapsed.has(cat.id);
@@ -250,26 +265,18 @@ export function Sidebar({
         <div className="sidebar__footer">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full" onClick={onAddFeed}>
-                <Plus className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Add feed</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="rounded-full"
+                size="sm"
+                className="rounded-full gap-2 px-3"
                 onClick={onRefresh}
                 disabled={refreshing}
               >
                 <RefreshCw className={`size-4 ${refreshing ? "spin" : ""}`} />
+                <span className="text-[13px]">Refresh</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Refresh feeds</TooltipContent>
+            <TooltipContent>Fetch new stories</TooltipContent>
           </Tooltip>
 
           <div className="topbar__spacer" />

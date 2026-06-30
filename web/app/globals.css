@@ -404,6 +404,24 @@
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
+.sidebar__group-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sidebar__add {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  color: var(--muted-foreground);
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.sidebar__add:hover {
+  background: color-mix(in oklch, var(--news-accent) 14%, transparent);
+  color: var(--news-accent);
+}
 .nav-item {
   position: relative;
   width: 100%;

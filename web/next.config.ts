@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The floating dev indicator sat on top of the sidebar's add-feed button.
+  devIndicators: false,
 };
 
 export default nextConfig;
