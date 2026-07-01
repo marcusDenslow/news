@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { Filter, FeedsTree, FeedNode } from "@/lib/types";
 import { Favicon } from "@/components/Img";
+import { feedColor } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -40,32 +41,24 @@ interface SidebarProps {
   onRemoveFeed: (feed: FeedNode) => void;
 }
 
-function NavItem({
+function ViewRow({
   icon,
   label,
   count,
   active,
   onClick,
-  indent,
 }: {
   icon: React.ReactNode;
   label: string;
   count?: number;
   active: boolean;
   onClick: () => void;
-  indent?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      className="nav-item"
-      data-active={active}
-      onClick={onClick}
-      style={indent ? { paddingLeft: 32 } : undefined}
-    >
-      <span className="nav-item__icon">{icon}</span>
-      <span className="nav-item__label">{label}</span>
-      {count != null && count > 0 && <span className="nav-item__count">{count}</span>}
+    <button type="button" className="viewrow" data-active={active} onClick={onClick}>
+      <span className="viewrow__icon">{icon}</span>
+      <span className="viewrow__label">{label}</span>
+      {count != null && count > 0 && <span className="viewrow__count">{count}</span>}
     </button>
   );
 }
@@ -75,7 +68,6 @@ function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const isDark = resolvedTheme === "dark";
-
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -114,15 +106,55 @@ export function Sidebar({
       return next;
     });
 
-  const is = (kind: Filter["kind"], id?: number) =>
-    filter.kind === kind && filter.id === id;
-
+  const is = (kind: Filter["kind"], id?: number) => filter.kind === kind && filter.id === id;
   const pick = (f: Filter) => {
     onSelect(f);
     onClose();
   };
 
-  const multiCat = (tree?.categories.length ?? 0) > 1;
+  const cats = tree?.categories ?? [];
+  const single = cats.length === 1;
+
+  const FeedRow = (feed: FeedNode) => (
+    <div
+      key={feed.id}
+      className="feedrow"
+      data-active={is("feed", feed.id)}
+      style={{ "--feed": feedColor(feed.id) } as React.CSSProperties}
+    >
+      <button
+        type="button"
+        className="feedrow__main"
+        onClick={() => pick({ kind: "feed", id: feed.id, label: feed.title })}
+      >
+        <span className="feedrow__avatar">
+          <Favicon feedId={feed.id} className="feedrow__favicon" />
+        </span>
+        <span className="feedrow__name">{feed.title}</span>
+      </button>
+      {feed.unread > 0 && <span className="feedrow__dot" aria-label={`${feed.unread} unread`} />}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className="feedrow__more" aria-label="Feed options">
+            <MoreHorizontal className="size-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="rounded-xl">
+          <DropdownMenuItem onClick={() => onMarkFeedRead(feed.id)}>
+            <CheckCheck className="size-4" />
+            Mark all as read
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => onRemoveFeed(feed)}
+          >
+            <Trash2 className="size-4" />
+            Remove feed
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 
   return (
     <>
@@ -136,28 +168,30 @@ export function Sidebar({
         </div>
 
         <nav className="sidebar__scroll">
-          <NavItem
-            icon={<Sparkles className="size-[18px]" />}
-            label="Today"
-            active={is("today")}
-            onClick={() => pick({ kind: "today", label: "Today" })}
-          />
-          <NavItem
-            icon={<CircleDot className="size-[18px]" />}
-            label="Unread"
-            count={tree?.totalUnread}
-            active={is("unread")}
-            onClick={() => pick({ kind: "unread", label: "Unread" })}
-          />
-          <NavItem
-            icon={<Bookmark className="size-[18px]" />}
-            label="Bookmarks"
-            count={tree?.starred}
-            active={is("starred")}
-            onClick={() => pick({ kind: "starred", label: "Bookmarks" })}
-          />
+          <div className="railviews">
+            <ViewRow
+              icon={<Sparkles className="size-[18px]" />}
+              label="Today"
+              active={is("today")}
+              onClick={() => pick({ kind: "today", label: "Today" })}
+            />
+            <ViewRow
+              icon={<CircleDot className="size-[18px]" />}
+              label="Unread"
+              count={tree?.totalUnread}
+              active={is("unread")}
+              onClick={() => pick({ kind: "unread", label: "Unread" })}
+            />
+            <ViewRow
+              icon={<Bookmark className="size-[18px]" />}
+              label="Saved"
+              count={tree?.starred}
+              active={is("starred")}
+              onClick={() => pick({ kind: "starred", label: "Saved" })}
+            />
+          </div>
 
-          <div className="sidebar__group-label sidebar__group-row">
+          <div className="rail-section-head">
             <span>Channels</span>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -174,92 +208,37 @@ export function Sidebar({
             </Tooltip>
           </div>
 
-          {tree?.categories.map((cat) => {
+          {cats.map((cat) => {
             const isCollapsed = collapsed.has(cat.id);
             return (
               <div key={cat.id}>
-                <div className="nav-item" data-active={is("category", cat.id)}>
-                  <button
-                    type="button"
-                    className="nav-item__icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggle(cat.id);
-                    }}
-                    aria-label={isCollapsed ? "Expand" : "Collapse"}
-                    style={{
-                      transition: "transform .18s ease",
-                      transform: isCollapsed ? "none" : "rotate(90deg)",
-                    }}
-                  >
-                    <ChevronRight className="size-4" />
-                  </button>
-                  <span
-                    className="nav-item__label"
-                    style={{ cursor: "pointer", fontWeight: 600 }}
-                    onClick={() =>
-                      pick({ kind: "category", id: cat.id, label: cat.title })
-                    }
-                  >
-                    {cat.title}
-                  </span>
-                  {cat.unread > 0 && <span className="nav-item__count">{cat.unread}</span>}
-                </div>
-
-                {!isCollapsed &&
-                  cat.feeds.map((feed) => (
-                    <div
-                      key={feed.id}
-                      className="nav-item"
-                      data-active={is("feed", feed.id)}
-                      style={{ paddingLeft: 32 }}
+                {!single && (
+                  <div className="catrow" data-active={is("category", cat.id)}>
+                    <button
+                      type="button"
+                      className="catrow__chevron"
+                      onClick={() => toggle(cat.id)}
+                      aria-label={isCollapsed ? "Expand" : "Collapse"}
+                      style={{ transform: isCollapsed ? "none" : "rotate(90deg)" }}
                     >
-                      <Favicon feedId={feed.id} className="nav-feedicon" />
-                      <span
-                        className="nav-item__label"
-                        style={{ cursor: "pointer" }}
-                        onClick={() => pick({ kind: "feed", id: feed.id, label: feed.title })}
-                      >
-                        {feed.title}
-                      </span>
-                      {feed.unread > 0 && <span className="nav-item__count">{feed.unread}</span>}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            className="nav-item__more"
-                            aria-label="Feed options"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl">
-                          <DropdownMenuItem onClick={() => onMarkFeedRead(feed.id)}>
-                            <CheckCheck className="size-4" />
-                            Mark all as read
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => onRemoveFeed(feed)}
-                          >
-                            <Trash2 className="size-4" />
-                            Remove feed
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  ))}
+                      <ChevronRight className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      className="catrow__name"
+                      onClick={() => pick({ kind: "category", id: cat.id, label: cat.title })}
+                    >
+                      {cat.title}
+                    </button>
+                    {cat.unread > 0 && <span className="catrow__count">{cat.unread}</span>}
+                  </div>
+                )}
+                {(single || !isCollapsed) && (
+                  <div className="feedlist">{cat.feeds.map((feed) => FeedRow(feed))}</div>
+                )}
               </div>
             );
           })}
-
-          {!multiCat &&
-            tree?.categories.length === 0 && (
-              <div style={{ padding: "12px 10px", fontSize: 13, color: "var(--muted-foreground)" }}>
-                No feeds yet.
-              </div>
-            )}
         </nav>
 
         <div className="sidebar__footer">
@@ -278,7 +257,6 @@ export function Sidebar({
             </TooltipTrigger>
             <TooltipContent>Fetch new stories</TooltipContent>
           </Tooltip>
-
           <div className="topbar__spacer" />
           <ThemeToggle />
         </div>

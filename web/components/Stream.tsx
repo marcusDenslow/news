@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Loader2, Inbox, AlertCircle, Check } from "lucide-react";
 import type { CardEntry, Filter } from "@/lib/types";
 import { Card, Hero } from "@/components/Card";
@@ -19,6 +20,26 @@ interface StreamProps {
   onOpen: (e: CardEntry) => void;
   onToggleStar: (e: CardEntry) => void;
   sentinelRef: React.RefObject<HTMLDivElement | null>;
+}
+
+function useColumns() {
+  const [cols, setCols] = useState(3);
+  useEffect(() => {
+    const calc = () => {
+      const w = window.innerWidth;
+      setCols(w < 680 ? 1 : w < 1100 ? 2 : 3);
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, []);
+  return cols;
+}
+
+function distribute<T>(items: T[], n: number): T[][] {
+  const cols: T[][] = Array.from({ length: n }, () => []);
+  items.forEach((it, i) => cols[i % n].push(it));
+  return cols;
 }
 
 function masthead(filter: Filter, search: string) {
@@ -128,6 +149,7 @@ export function Stream({
   sentinelRef,
 }: StreamProps) {
   const { eyebrow, title } = masthead(filter, search);
+  const cols = useColumns();
 
   const lead = entries[0];
   const briefs = entries.slice(1, 5);
@@ -198,8 +220,18 @@ export function Stream({
 
           {flow.length > 0 && (
             <div className="flow">
-              {flow.map((entry, i) => (
-                <Card key={entry.id} entry={entry} index={i} onOpen={onOpen} onToggleStar={onToggleStar} />
+              {distribute(flow, cols).map((col, ci) => (
+                <div className="flow-col" key={ci}>
+                  {col.map((entry, i) => (
+                    <Card
+                      key={entry.id}
+                      entry={entry}
+                      index={i * cols + ci}
+                      onOpen={onOpen}
+                      onToggleStar={onToggleStar}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
           )}

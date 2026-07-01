@@ -512,6 +512,200 @@
   gap: 6px;
 }
 
+/* ---- Primary views (Today / Unread / Saved) ---- */
+.railviews {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.viewrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 14px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--foreground);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.14s ease;
+}
+.viewrow:hover {
+  background: var(--sidebar-accent);
+}
+.viewrow__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.viewrow__label {
+  flex: 1;
+}
+.viewrow__count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+.viewrow[data-active="true"] {
+  color: var(--news-accent);
+  font-weight: 600;
+}
+.viewrow[data-active="true"] .viewrow__icon {
+  background: var(--news-accent);
+  color: #fff;
+  box-shadow: 0 4px 12px color-mix(in oklch, var(--news-accent) 40%, transparent);
+}
+.viewrow[data-active="true"] .viewrow__count {
+  color: var(--news-accent);
+}
+
+/* ---- Channels ---- */
+.rail-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 10px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.catrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 12px;
+}
+.catrow__chevron {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--muted-foreground);
+  transition: transform 0.18s ease;
+}
+.catrow__name {
+  flex: 1;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.catrow[data-active="true"] .catrow__name {
+  color: var(--news-accent);
+}
+.catrow__count {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.feedlist {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.feedrow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 4px 6px;
+  border-radius: 14px;
+  transition: background 0.14s ease;
+}
+.feedrow:hover {
+  background: var(--sidebar-accent);
+}
+.feedrow[data-active="true"] {
+  background: color-mix(in oklch, var(--feed) 12%, transparent);
+}
+.feedrow__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 5px 2px;
+  cursor: pointer;
+  text-align: left;
+}
+.feedrow__avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  transition: box-shadow 0.16s ease;
+}
+.feedrow__favicon {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+.feedrow[data-active="true"] .feedrow__avatar {
+  box-shadow: 0 0 0 2px var(--feed), 0 0 0 4px color-mix(in oklch, var(--feed) 26%, transparent);
+}
+.feedrow__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.feedrow[data-active="true"] .feedrow__name {
+  font-weight: 600;
+}
+.feedrow__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 6px;
+  background: var(--feed);
+}
+.feedrow__more {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.feedrow:hover .feedrow__dot {
+  display: none;
+}
+.feedrow:hover .feedrow__more {
+  opacity: 1;
+}
+.feedrow__more:hover {
+  background: color-mix(in oklch, var(--foreground) 10%, transparent);
+  color: var(--foreground);
+}
+
 .sidebar__backdrop {
   display: none;
 }
@@ -776,23 +970,19 @@
 /*  Flow (cards)                                                         */
 /* ===================================================================== */
 
+/* JS-distributed columns (flexbox) — avoids the Safari CSS-multicol + transform
+   bug where hovered cards vanish and later columns fail to paint. */
 .flow {
-  columns: 1;
-  column-gap: 22px;
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
 }
-@media (min-width: 640px) {
-  .flow {
-    columns: 2;
-  }
-}
-@media (min-width: 1060px) {
-  .flow {
-    columns: 3;
-  }
-}
-.flow > * {
-  break-inside: avoid;
-  margin-bottom: 22px;
+.flow-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 }
 
 .card {
@@ -808,7 +998,6 @@
   color: var(--card-foreground);
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
 }
 @media (hover: hover) {
   .card:hover {
@@ -988,6 +1177,43 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   background: transparent;
+}
+/* Ambient backlight: a blurred, enlarged copy of the hero whose colors bleed
+   into the page background near the top (Apple Music "ambient background"). */
+.reader__ambient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 86vh;
+  z-index: 0;
+  background-size: cover;
+  background-position: center 22%;
+  filter: blur(80px) saturate(1.8);
+  transform: scale(1.3);
+  transform-origin: center top;
+  opacity: 0.62;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.55) 38%,
+    transparent 72%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.55) 38%,
+    transparent 72%
+  );
+}
+.dark .reader__ambient {
+  opacity: 0.5;
+}
+.reader__hero,
+.reader__article {
+  position: relative;
+  z-index: 1;
 }
 .reader__progress {
   position: fixed;

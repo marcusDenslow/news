@@ -32,13 +32,23 @@ function processHtml(html: string): string {
     if (src && /^https?:\/\//.test(src)) img.setAttribute("src", imgProxy(src));
     else if (src) img.remove();
   });
-  // <picture><source> would bypass our proxy — drop the sources, keep <img>.
-  doc.querySelectorAll("source").forEach((s) => s.remove());
+  // <picture><source> would bypass our proxy — drop only those, NOT <video>/<audio> sources.
+  doc.querySelectorAll("picture source").forEach((s) => s.remove());
   doc.querySelectorAll("a").forEach((a) => {
     a.setAttribute("target", "_blank");
     a.setAttribute("rel", "noopener noreferrer");
   });
-  doc.querySelectorAll("iframe").forEach((f) => f.setAttribute("loading", "lazy"));
+  doc.querySelectorAll("iframe").forEach((f) => {
+    f.setAttribute("loading", "lazy");
+    f.setAttribute("allowfullscreen", "true");
+    // Some feeds lazy-load embeds via data-src; promote it so the video shows.
+    const dataSrc = f.getAttribute("data-src");
+    if (dataSrc && !f.getAttribute("src")) f.setAttribute("src", dataSrc);
+  });
+  doc.querySelectorAll("video").forEach((v) => {
+    v.setAttribute("controls", "true");
+    v.removeAttribute("autoplay");
+  });
   return doc.body.innerHTML;
 }
 
@@ -110,6 +120,17 @@ export function Reader({ entry, onClose, onToggleStar }: ReaderProps) {
       />
 
       <motion.div className="reader" ref={scrollRef}>
+        {entry.image && (
+          <motion.div
+            className="reader__ambient"
+            aria-hidden
+            style={{ backgroundImage: `url(${imgProxy(entry.image)})` }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+          />
+        )}
         <motion.div className="reader__progress" style={{ scaleX: scrollYProgress, width: "100%" }} />
 
         <motion.div
