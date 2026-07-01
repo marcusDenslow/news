@@ -1,0 +1,74 @@
+#!/usr/bin/env sh
+# NewsHub CLI — manage server-side subscription cookies with no browser extension.
+# Pure POSIX sh + curl, so it runs on a bare Ubuntu server.
+#
+#   newshub config <hub-url> <capture-token>
+#   newshub set-cookie <domain>     # cookie read from stdin
+#   newshub list
+#   newshub rm <domain>
+#
+# Getting the cookie (do this in any browser where you're logged into the site):
+#   DevTools (F12) -> Network -> reload -> click the document request ->
+#   Request Headers -> copy the whole "Cookie:" value. Then:
+#     pbpaste | newshub set-cookie varden.no        (macOS)
+#     newshub set-cookie varden.no < cookie.txt     (from a file)
+
+set -eu
+
+CONFIG="${NEWSHUB_CONFIG:-${HOME}/.config/newshub/config}"
+[ -f "$CONFIG" ] && . "$CONFIG" || true
+URL="${NEWSHUB_URL:-${URL:-}}"
+TOKEN="${NEWSHUB_TOKEN:-${TOKEN:-}}"
+
+usage() {
+  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+need_config() {
+  if [ -z "$URL" ] || [ -z "$TOKEN" ]; then
+    echo "error: not configured. Run: newshub config <hub-url> <capture-token>" >&2
+    exit 1
+  fi
+}
+
+cmd="${1:-help}"
+[ $# -gt 0 ] && shift || true
+
+case "$cmd" in
+  config)
+    [ $# -eq 2 ] || { echo "usage: newshub config <hub-url> <capture-token>" >&2; exit 1; }
+    mkdir -p "$(dirname "$CONFIG")"
+    printf 'URL=%s\nTOKEN=%s\n' "$1" "$2" > "$CONFIG"
+    chmod 600 "$CONFIG"
+    echo "saved -> $CONFIG"
+    ;;
+  set-cookie)
+    [ $# -ge 1 ] || { echo "usage: newshub set-cookie <domain>   (cookie on stdin)" >&2; exit 1; }
+    need_config
+    # --data-binary @- sends the raw stdin cookie; no JSON/shell escaping.
+    curl -fsS -X POST "$URL/api/premium/cookie?domain=$1" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: text/plain" \
+      --data-binary @-
+    echo ""
+    ;;
+  list)
+    need_config
+    curl -fsS "$URL/api/premium/cookie" -H "Authorization: Bearer $TOKEN"
+    echo ""
+    ;;
+  rm)
+    [ $# -ge 1 ] || { echo "usage: newshub rm <domain>" >&2; exit 1; }
+    need_config
+    curl -fsS -X DELETE "$URL/api/premium/cookie?domain=$1" -H "Authorization: Bearer $TOKEN"
+    echo ""
+    ;;
+  help | -h | --help)
+    usage
+    ;;
+  *)
+    echo "unknown command: $cmd" >&2
+    usage
+    exit 1
+    ;;
+esac

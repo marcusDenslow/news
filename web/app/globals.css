@@ -187,6 +187,26 @@
   flex: 1;
   min-width: 0;
 }
+/* When the reader opens, the whole feed steps back and dims — the story is
+   lifted off the stack. Gated on no-preference so reduced-motion users get no
+   scale jump; the opaque backdrop covers the parked page either way. */
+@media (prefers-reduced-motion: no-preference) {
+  .main {
+    transform-origin: 50% 34%;
+    /* No transition at rest — the recede lives on the open state below. On close
+       the feed snaps back to full size in one frame, while the backdrop is still
+       fully opaque, so the card revealed under the collapsing hero is already at
+       its final size. (Easing it back here made the just-landed image keep
+       growing 0.965 → 1 after the flight finished — the "resize right after".) */
+  }
+  .main[data-reader-open="true"] {
+    transform: scale(0.965) translateY(6px);
+    filter: brightness(0.7) saturate(0.94);
+    /* Recede only on the way in, glimpsed through the backdrop as it fades up. */
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+      filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
 .stream {
   max-width: 2000px;
   margin: 0 auto;
@@ -242,20 +262,33 @@
   position: sticky;
   top: 0;
   z-index: 40;
-  height: 60px;
+  height: 64px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 22px;
-  background: color-mix(in oklch, var(--background) 70%, transparent);
-  backdrop-filter: saturate(180%) blur(22px);
-  -webkit-backdrop-filter: saturate(180%) blur(22px);
-  border-bottom: 1px solid var(--hairline);
+  padding: 0 18px;
+  /* Bar itself is invisible — only the controls float as glass chips. */
+  background: transparent;
+  pointer-events: none;
+}
+.topbar > * {
+  pointer-events: auto;
 }
 @media (max-width: 680px) {
   .topbar {
     padding: 0 12px;
   }
+}
+/* Shared glass treatment for the floating controls. */
+.topbar [data-slot="button"] {
+  background: color-mix(in oklch, var(--background) 74%, transparent);
+  backdrop-filter: saturate(170%) blur(16px);
+  -webkit-backdrop-filter: saturate(170%) blur(16px);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 2px 10px rgba(20, 18, 28, 0.06);
+}
+.dark .topbar [data-slot="button"] {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.36);
 }
 .topbar__spacer {
   flex: 1;
@@ -292,15 +325,21 @@
 }
 .topbar__search-input {
   width: 100%;
-  height: 38px;
+  height: 40px;
   padding: 0 32px 0 35px;
   border-radius: 999px;
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
-  border: 1px solid transparent;
+  background: color-mix(in oklch, var(--background) 74%, transparent);
+  backdrop-filter: saturate(170%) blur(16px);
+  -webkit-backdrop-filter: saturate(170%) blur(16px);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 2px 10px rgba(20, 18, 28, 0.06);
   font-size: 14px;
   color: var(--foreground);
   outline: none;
   transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.dark .topbar__search-input {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.36);
 }
 .topbar__search-input::placeholder {
   color: var(--muted-foreground);
@@ -329,15 +368,22 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 36px;
-  padding: 0 14px;
+  height: 40px;
+  padding: 0 16px;
   border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
   color: var(--foreground);
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
-  transition: background 0.15s ease, transform 0.1s ease;
+  background: color-mix(in oklch, var(--background) 74%, transparent);
+  backdrop-filter: saturate(170%) blur(16px);
+  -webkit-backdrop-filter: saturate(170%) blur(16px);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 2px 10px rgba(20, 18, 28, 0.06);
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
   white-space: nowrap;
+}
+.dark .markall-btn {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.36);
 }
 .markall-btn:hover {
   background: color-mix(in oklch, var(--news-accent) 14%, transparent);
@@ -741,21 +787,28 @@
 /*  Front-page composition (lead + Latest briefs)                        */
 /* ===================================================================== */
 
+/* Flex with JS-driven widths (see Stream) so Framer can animate the hero +
+   briefs on resize instead of the browser snapping them. */
 .frontpage {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
   gap: 22px;
+  align-items: stretch;
   margin-bottom: 24px;
 }
-@media (min-width: 920px) {
-  .frontpage {
-    grid-template-columns: 1.62fr 1fr;
-    align-items: stretch;
-  }
+.frontpage[data-stacked="true"] {
+  flex-direction: column;
 }
-.frontpage .hero {
+.frontpage__col {
+  display: flex;
+  flex-shrink: 0;
+}
+.frontpage__col > .hero {
+  width: 100%;
   height: 100%;
   margin-bottom: 0;
+}
+.briefs {
+  flex-shrink: 0;
 }
 
 .briefs {
@@ -893,6 +946,11 @@
   object-fit: cover;
   display: block;
 }
+/* Just the image morphs into the reader; the scrim stays behind and fades. */
+.hero__media-img {
+  position: absolute;
+  inset: 0;
+}
 .hero__scrim {
   position: absolute;
   inset: 0;
@@ -974,17 +1032,208 @@
 }
 
 /* ===================================================================== */
+/*  Hero carousel                                                        */
+/* ===================================================================== */
+
+/* Fixed-size viewport that clips the sliding stories. aspect-ratio + min-height
+   mirror the single hero's media box so the front page keeps its proportions. */
+.hero-carousel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 16 / 10;
+  min-height: 360px;
+  border-radius: var(--r-lead);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  background: var(--muted);
+  isolation: isolate;
+}
+.frontpage__col > .hero-carousel {
+  height: 100%;
+}
+/* Each story fills the viewport; the carousel owns the clip, radius and shadow,
+   so the inner hero drops its own (and its hover lift, which would show a seam). */
+.hero-carousel__slide {
+  position: absolute;
+  inset: 0;
+}
+.hero-carousel__slide > .hero,
+.hero-carousel__slide > .hero:hover {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+.hero-carousel__slide > .hero .hero__media {
+  aspect-ratio: auto;
+  min-height: 0;
+}
+
+/* Minimal control cluster, centered along the bottom edge. No chrome — bare dots
+   and (on hover) bare chevrons, kept legible over photos with a soft shadow. */
+.hero-carousel__controls {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hero-carousel__dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 6px;
+}
+.hero-carousel__dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  cursor: pointer;
+  transition: width 0.34s cubic-bezier(0.22, 1, 0.36, 1), background 0.25s ease;
+}
+.hero-carousel__dot:hover {
+  background: rgba(255, 255, 255, 0.82);
+}
+.hero-carousel__dot[data-active="true"] {
+  width: 22px;
+  background: #fff;
+}
+.hero-carousel__arrow {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
+  cursor: pointer;
+  /* Hidden until the cluster is hovered; space stays reserved so nothing jumps. */
+  opacity: 0;
+  transform: scale(0.9);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hero-carousel__controls:hover .hero-carousel__arrow,
+.hero-carousel__arrow:focus-visible {
+  opacity: 0.88;
+  transform: scale(1);
+  pointer-events: auto;
+}
+.hero-carousel__arrow:hover {
+  opacity: 1;
+}
+.hero-carousel__arrow:active {
+  transform: scale(0.9);
+}
+@media (hover: none) {
+  /* No hover on touch — keep the arrows visible so the card stays navigable. */
+  .hero-carousel__arrow {
+    opacity: 0.88;
+    transform: none;
+    pointer-events: auto;
+  }
+}
+/* Auto-advance countdown ring, tucked bottom-right. */
+.hero-carousel__timer {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 3;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+.hero-carousel__timer svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg); /* start the fill at 12 o'clock */
+}
+.hero-carousel__timer circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+.hero-carousel__timer-track {
+  stroke: rgba(255, 255, 255, 0.3);
+}
+.hero-carousel__timer-fill {
+  stroke: #fff;
+  stroke-linecap: round;
+  stroke-dasharray: 100; /* pathLength=100 → dash units are % of the ring */
+  animation: hero-ring linear forwards;
+}
+@keyframes hero-ring {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ===================================================================== */
 /*  Flow (cards)                                                         */
 /* ===================================================================== */
 
 /* JS-distributed columns (flexbox) — avoids the Safari CSS-multicol + transform
    bug where hovered cards vanish and later columns fail to paint. */
+/* Absolute-positioned masonry. Each card is placed by JS (see useMasonryLayout)
+   and animates its transform to the new slot on reflow — so a resize/zoom glides
+   every card instead of the browser teleporting them via flex. */
 .flow {
+  position: relative;
+  width: 100%;
+}
+.card-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Positions are set instantly (no transition) — zooming just re-fills the
+     grid, no glide. */
+}
+/* Held invisible until the card scrolls into view (see Card phases). */
+.card-slot[data-phase="pending"] > .card {
+  opacity: 0;
+}
+/* Entrance: rise + fade + a touch of scale, once, when the card enters view. */
+.card-slot[data-phase="enter"] > .card {
+  animation: card-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-slot[data-phase="pending"] > .card {
+    opacity: 1;
+  }
+}
+
+/* Skeleton keeps a simple flex grid (no measured heights to animate). */
+.flow-skeleton {
   display: flex;
   gap: 22px;
   align-items: flex-start;
 }
-.flow-col {
+.flow-skeleton__col {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
@@ -1003,6 +1252,8 @@
   cursor: pointer;
   padding: 10px;
   color: var(--card-foreground);
+  /* The card owns hover/press transforms; the .card-slot wrapper owns the
+     layout transform, so the two never fight. */
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1014,12 +1265,6 @@
 }
 .card:active {
   transform: translateY(-1px) scale(0.992);
-}
-.card[data-read="true"] {
-  opacity: 0.6;
-}
-.card[data-read="true"]:hover {
-  opacity: 1;
 }
 
 .card__media {
@@ -1235,26 +1480,50 @@
   position: sticky;
   top: 0;
   z-index: 62;
-  height: 56px;
+  height: 60px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 0 16px;
+  /* Transparent bar — legibility lives on the button chips themselves. */
+  background: transparent;
+  pointer-events: none;
+}
+.reader__bar > * {
+  pointer-events: auto;
+}
+.reader__bar [data-slot="button"] {
   background: color-mix(in oklch, var(--background) 68%, transparent);
-  backdrop-filter: saturate(180%) blur(22px);
-  -webkit-backdrop-filter: saturate(180%) blur(22px);
-  border-bottom: 1px solid var(--hairline);
+  backdrop-filter: saturate(170%) blur(18px);
+  -webkit-backdrop-filter: saturate(170%) blur(18px);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 2px 14px rgba(20, 18, 28, 0.12);
+}
+.dark .reader__bar [data-slot="button"] {
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.44);
 }
 .reader__bar-spacer {
   flex: 1;
+  pointer-events: none;
+}
+.reader__back-twirl {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
 }
 .reader__hero {
   position: relative;
-  width: 100%;
-  max-width: 1100px;
+  /* Adopt the *source card's* exact aspect ratio (--hero-aspect, set inline from
+     the captured origin rect) so the shared-element morph is a pure uniform scale
+     with a matching cover-crop — no squash and no aspect snap when the reader hero
+     is removed and the card underneath is revealed. Height is capped by clamping
+     the width (74vh * aspect), so the cap never distorts the ratio the way a bare
+     max-height did. */
+  --hero-aspect: 1.6;
+  width: min(100%, 1100px, calc(74vh * var(--hero-aspect)));
   margin: 14px auto 0;
-  aspect-ratio: 16 / 8;
-  max-height: 62vh;
+  aspect-ratio: var(--hero-aspect);
   overflow: hidden;
   border-radius: var(--r-lead);
   background: var(--muted);

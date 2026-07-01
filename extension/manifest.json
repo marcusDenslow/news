@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "News Hub Capture",
+  "version": "0.1.0",
+  "description": "Send the full text of articles you're logged in to read to your self-hosted News Hub. Credentials never leave your browser.",
+  "permissions": ["activeTab", "scripting", "storage", "tabs", "alarms", "cookies"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Capture to News Hub"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        width: 300px;
+        margin: 0;
+        padding: 14px;
+        font: 13px/1.4 system-ui, -apple-system, sans-serif;
+      }
+      h1 { font-size: 14px; margin: 0 0 10px; }
+      label { display: block; font-weight: 600; margin: 10px 0 4px; }
+      input[type="url"], input[type="password"], input[type="text"], input[type="number"] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 7px 8px;
+        border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+        border-radius: 8px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+      }
+      .check { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; font-weight: 600; }
+      .check input { width: auto; }
+      .row { display: flex; gap: 8px; margin-top: 12px; }
+      button {
+        flex: 1;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 8px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #capture { background: #1d9bf0; color: #fff; }
+      #save, #runNow { background: color-mix(in srgb, currentColor 12%, transparent); color: inherit; }
+      button:disabled { opacity: 0.55; cursor: default; }
+      hr { margin: 14px 0 2px; border: none; border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
+      .hint { margin: 6px 0 0; opacity: 0.65; font-size: 11px; }
+      .status { margin-top: 10px; min-height: 16px; font-size: 12px; }
+      .status.ok { color: #16a34a; }
+      .status.err { color: #e0245e; }
+    </style>
+  </head>
+  <body>
+    <h1>News Hub Capture</h1>
+
+    <label for="hubUrl">Hub URL</label>
+    <input id="hubUrl" type="url" placeholder="http://localhost:3000" />
+
+    <label for="token">Capture token</label>
+    <input id="token" type="password" placeholder="from your Hub's .env (CAPTURE_TOKEN)" />
+    <p class="hint">Stored only in this browser. Sent to your Hub as a bearer token.</p>
+
+    <div class="row">
+      <button id="save">Save</button>
+      <button id="capture">Capture this page</button>
+    </div>
+
+    <hr />
+
+    <div class="check">
+      <input id="autoEnabled" type="checkbox" />
+      <label for="autoEnabled" style="margin: 0;">Auto-capture (continuous)</label>
+    </div>
+
+    <label for="autoDomains">Domains (comma-separated)</label>
+    <input id="autoDomains" type="text" placeholder="varden.no, aftenposten.no" />
+
+    <label for="intervalMin">Check every (minutes)</label>
+    <input id="intervalMin" type="number" min="5" placeholder="15" />
+
+    <div class="row">
+      <button id="runNow">Run now</button>
+    </div>
+    <p class="hint">
+      While Chrome is open, fills in full text for new articles from these sites,
+      using your logged-in session. Opens each briefly in a background window.
+    </p>
+
+    <hr />
+
+    <div style="font-weight: 600; margin-bottom: 2px;">Server-side (headless)</div>
+    <p class="hint" style="margin-top: 2px;">
+      Log into the news site, then click below. The hub fetches it with no browser
+      open. Cookie is read once, kept fresh, and stored encrypted on your hub.
+    </p>
+    <div class="row">
+      <button id="linkSite">Link this site</button>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -22,6 +22,10 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [selected, setSelected] = useState<CardEntry | null>(null);
+  // On-screen rect of the clicked card image, captured at click time. The reader
+  // flies a single image element from here into its hero (and back on close).
+  // Cleared once the close animation finishes (AnimatePresence onExitComplete).
+  const [origin, setOrigin] = useState<DOMRect | undefined>(undefined);
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: tree, mutate: mutateTree } = useSWR<FeedsTree>(
@@ -164,8 +168,9 @@ export function App() {
   /* ---- reader open/close with history ---- */
 
   const openEntry = useCallback(
-    (entry: CardEntry) => {
+    (entry: CardEntry, originRect?: DOMRect) => {
       setSelected(entry);
+      setOrigin(originRect);
       window.history.pushState({ reader: entry.id }, "", `#a${entry.id}`);
       markRead(entry);
     },
@@ -287,7 +292,7 @@ export function App() {
         onRemoveFeed={removeFeed}
       />
 
-      <main className="main">
+      <main className="main" data-reader-open={!!selected}>
         <TopBar
           title={filter.label}
           onMenu={() => setSidebarOpen(true)}
@@ -312,11 +317,12 @@ export function App() {
         />
       </main>
 
-      <AnimatePresence>
+      <AnimatePresence onExitComplete={() => setOrigin(undefined)}>
         {selected && (
           <Reader
             key={selected.id}
             entry={selected}
+            origin={origin}
             onClose={closeReader}
             onToggleStar={toggleStar}
           />

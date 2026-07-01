@@ -26,5 +26,33 @@ services:
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: changeme123
 
+  web:
+    build: ./web
+    ports:
+      - "3000:3000"
+    depends_on:
+      - miniflux
+    environment:
+      MINIFLUX_URL: "http://miniflux:8080"
+      MINIFLUX_TOKEN: "${MINIFLUX_TOKEN:?set MINIFLUX_TOKEN in .env}"
+      CAPTURE_TOKEN: "${CAPTURE_TOKEN:?set CAPTURE_TOKEN in .env}"
+      NEWSHUB_DATA_DIR: "/data"
+      # Server-side (headless) fetch mode — optional. Blank NEWSHUB_SECRET_KEY = off.
+      NEWSHUB_SECRET_KEY: "${NEWSHUB_SECRET_KEY:-}"
+      NEWSHUB_RENDERER_URL: "${NEWSHUB_RENDERER_URL:-}"
+      NEWSHUB_BACKFILL_MIN: "${NEWSHUB_BACKFILL_MIN:-15}"
+    volumes:
+      - captures:/data
+    restart: unless-stopped
+
+  # Chromium renderer for JS-heavy paywalls. Off by default; enable with:
+  #   NEWSHUB_RENDERER_URL=http://renderer:4000  +  docker compose --profile heavy up -d
+  renderer:
+    build: ./renderer
+    profiles: ["heavy"]
+    shm_size: "1gb"
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  captures:

@@ -13,6 +13,7 @@
     "@types/jsdom": "^28.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dompurify": "^3.4.11",
     "jsdom": "^29.1.1",
     "lucide-react": "^1.22.0",
     "motion": "^12.42.2",
