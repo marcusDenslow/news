@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { Loader2, Inbox, AlertCircle, Check } from "lucide-react";
 import type { CardEntry, Filter } from "@/lib/types";
 import { Card, Hero } from "@/components/Card";
@@ -22,17 +23,32 @@ interface StreamProps {
   sentinelRef: React.RefObject<HTMLDivElement | null>;
 }
 
-function useColumns() {
+const MIN_CARD = 300;
+const COL_GAP = 22;
+const MAX_COLS = 6;
+
+// Column count grows to fill the available width — when there's room for another
+// full-width card, add one (never squishes below MIN_CARD).
+function useColumns(ref: React.RefObject<HTMLDivElement | null>) {
   const [cols, setCols] = useState(3);
   useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
     const calc = () => {
-      const w = window.innerWidth;
-      setCols(w < 680 ? 1 : w < 1100 ? 2 : 3);
+      const cs = getComputedStyle(el);
+      const inner =
+        el.clientWidth - parseFloat(cs.paddingLeft || "0") - parseFloat(cs.paddingRight || "0");
+      const n = Math.min(
+        MAX_COLS,
+        Math.max(1, Math.floor((inner + COL_GAP) / (MIN_CARD + COL_GAP)))
+      );
+      setCols((prev) => (prev === n ? prev : n));
     };
     calc();
-    window.addEventListener("resize", calc);
-    return () => window.removeEventListener("resize", calc);
-  }, []);
+    const ro = new ResizeObserver(calc);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
   return cols;
 }
 
@@ -149,14 +165,15 @@ export function Stream({
   sentinelRef,
 }: StreamProps) {
   const { eyebrow, title } = masthead(filter, search);
-  const cols = useColumns();
+  const streamRef = useRef<HTMLDivElement>(null);
+  const cols = useColumns(streamRef);
 
   const lead = entries[0];
   const briefs = entries.slice(1, 5);
   const flow = entries.slice(5);
 
   return (
-    <div className="stream">
+    <div className="stream" ref={streamRef}>
       <header className="masthead">
         <div className="masthead__eyebrow" suppressHydrationWarning>
           {eyebrow}
@@ -220,19 +237,30 @@ export function Stream({
 
           {flow.length > 0 && (
             <div className="flow">
-              {distribute(flow, cols).map((col, ci) => (
-                <div className="flow-col" key={ci}>
-                  {col.map((entry, i) => (
-                    <Card
-                      key={entry.id}
-                      entry={entry}
-                      index={i * cols + ci}
-                      onOpen={onOpen}
-                      onToggleStar={onToggleStar}
-                    />
-                  ))}
-                </div>
-              ))}
+              {distribute(flow, cols).map((col, ci) => {
+                const center = (cols - 1) / 2;
+                const dir = ci < center ? -1 : ci > center ? 1 : 0;
+                const dist = Math.abs(ci - center);
+                return (
+                  <motion.div
+                    className="flow-col"
+                    key={`col-${cols}-${ci}`}
+                    initial={{ opacity: 0, x: dir * 36, y: dir === 0 ? 14 : 0 }}
+                    animate={{ opacity: 1, x: 0, y: 0 }}
+                    transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: dist * 0.05 }}
+                  >
+                    {col.map((entry, i) => (
+                      <Card
+                        key={entry.id}
+                        entry={entry}
+                        index={i}
+                        onOpen={onOpen}
+                        onToggleStar={onToggleStar}
+                      />
+                    ))}
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import {
-  Sparkles,
+  Newspaper,
   CircleDot,
   Bookmark,
   ChevronRight,
@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Sun,
   Moon,
-  Newspaper,
   MoreHorizontal,
   CheckCheck,
   Trash2,
@@ -161,16 +160,13 @@ export function Sidebar({
       {open && <div className="sidebar__backdrop" onClick={onClose} />}
       <aside className="sidebar" data-open={open}>
         <div className="sidebar__brand">
-          <span className="sidebar__brandmark">
-            <Newspaper className="size-4" />
-          </span>
-          News
+          News<span className="sidebar__brand-dot" aria-hidden />
         </div>
 
         <nav className="sidebar__scroll">
           <div className="railviews">
             <ViewRow
-              icon={<Sparkles className="size-[18px]" />}
+              icon={<Newspaper className="size-[18px]" />}
               label="Today"
               active={is("today")}
               onClick={() => pick({ kind: "today", label: "Today" })}

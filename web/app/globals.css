@@ -188,7 +188,7 @@
   min-width: 0;
 }
 .stream {
-  max-width: 1200px;
+  max-width: 2000px;
   margin: 0 auto;
   padding: 0 28px 160px;
 }
@@ -373,13 +373,20 @@
 }
 .sidebar__brand {
   display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 20px 22px 16px;
+  align-items: baseline;
+  gap: 2px;
+  padding: 22px 22px 18px;
   font-family: var(--font-display-stack);
   font-weight: 600;
-  font-size: 23px;
-  letter-spacing: -0.02em;
+  font-size: 25px;
+  letter-spacing: -0.025em;
+}
+.sidebar__brand-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--news-accent);
+  align-self: baseline;
 }
 .sidebar__brandmark {
   display: grid;
