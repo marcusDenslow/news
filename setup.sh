@@ -1,9 +1,25 @@
 #!/usr/bin/env sh
 # One-command setup. Generates secrets (once), starts everything, and mints the
-# Miniflux API token automatically. Safe to re-run — it never clobbers existing
-# secrets or a working token.
+# Miniflux API token automatically. Safe to re-run.
+#
+# Usage: ./setup.sh [--port N] [--profile heavy]
+#   --port N          publish the reader on host port N (default 3000)
+#   --profile heavy   also run the Chromium renderer (for JS-rendered paywalls)
 set -eu
 cd "$(dirname "$0")"
+
+HEAVY=0
+PORT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --profile) [ "${2:-}" = "heavy" ] && HEAVY=1; shift; [ $# -gt 0 ] && shift ;;
+    --heavy) HEAVY=1; shift ;;
+    --port) PORT="${2:-}"; shift; [ $# -gt 0 ] && shift ;;
+    --port=*) PORT="${1#--port=}"; shift ;;
+    -h | --help) echo "usage: ./setup.sh [--port N] [--profile heavy]"; exit 0 ;;
+    *) echo "unknown arg: $1 (see --help)"; exit 1 ;;
+  esac
+done
 
 gen() { openssl rand -hex "$1" 2>/dev/null || head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 getval() { grep "^$1=" .env 2>/dev/null | head -n1 | cut -d= -f2-; }
@@ -23,6 +39,13 @@ echo "securing secrets..."
 ensure_secret CAPTURE_TOKEN 24
 ensure_secret NEWSHUB_SECRET_KEY 32
 [ -n "$(getval MINIFLUX_TOKEN)" ] || setval MINIFLUX_TOKEN placeholder
+
+[ -n "$PORT" ] && { setval WEB_PORT "$PORT"; echo "  reader port -> $PORT"; }
+WEB_PORT=$(getval WEB_PORT); WEB_PORT=${WEB_PORT:-3000}
+
+# --profile heavy is sticky: once the renderer URL is set it stays on across re-runs.
+[ -n "$(getval NEWSHUB_RENDERER_URL)" ] && HEAVY=1
+[ "$HEAVY" = "1" ] && { setval NEWSHUB_RENDERER_URL "http://renderer:4000"; echo "  Chromium renderer: on"; }
 
 echo "starting db + miniflux..."
 docker compose up -d db miniflux
@@ -52,13 +75,18 @@ if [ "$(getval MINIFLUX_TOKEN)" = "placeholder" ]; then
   echo "minted Miniflux API token"
 fi
 
-echo "building + starting the reader..."
-docker compose up -d --build web
+if [ "$HEAVY" = "1" ]; then
+  echo "building + starting reader + Chromium renderer..."
+  docker compose --profile heavy up -d --build web renderer
+else
+  echo "building + starting the reader..."
+  docker compose up -d --build web
+fi
 
 IP=$(hostname -I 2>/dev/null | awk '{print $1}'); IP=${IP:-localhost}
 echo ""
 echo "Ready."
-echo "  Reader:        http://$IP:3000"
+echo "  Reader:        http://$IP:$WEB_PORT"
 echo "  Miniflux:      http://$IP:8080"
 echo "  Capture token: $(getval CAPTURE_TOKEN)"
 echo "    (use it in the extension / \`cli/newshub config\` to link subscriptions)"
