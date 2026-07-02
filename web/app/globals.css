@@ -143,6 +143,8 @@
     @apply font-sans;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    max-width: 100%;
   }
   body {
     @apply bg-background text-foreground;
@@ -179,6 +181,8 @@
 .app {
   display: flex;
   min-height: 100dvh;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 .scroll-lock {
   overflow: hidden;
