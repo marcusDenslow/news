@@ -1431,6 +1431,7 @@
   inset: 0;
   z-index: 61;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   background: transparent;
 }
@@ -1625,6 +1626,14 @@
   line-height: 1.72;
   color: color-mix(in oklch, var(--foreground) 92%, var(--muted-foreground));
   padding-top: 26px;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+.article-body :is(img, video, iframe, table, pre) {
+  max-width: 100%;
+}
+.article-body img {
+  height: auto;
 }
 .article-body p {
   margin: 0 0 1.2em;
