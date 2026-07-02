@@ -50,30 +50,19 @@ Free RSS ─► Miniflux ─────►  shows captured full text when prese
 Requires Docker + Docker Compose.
 
 ```bash
-git clone <your-repo> news-hub && cd news-hub
-cp .env.example .env
+git clone https://github.com/marcusDenslow/news.git && cd news
+./setup.sh
 ```
 
-The Miniflux API token only exists once Miniflux is running, so bring it up staged:
+`setup.sh` generates the secrets once, starts Postgres + Miniflux, mints the
+Miniflux API token automatically, and builds the reader — no manual editing, no
+`sed`, no token copying. It's idempotent (safe to re-run), and prints the reader
+URL and your capture token when it finishes.
 
-```bash
-# 1. put a real capture token in .env now (miniflux token comes next):
-sed -i '' "s/^CAPTURE_TOKEN=.*/CAPTURE_TOKEN=$(openssl rand -hex 24)/" .env   # macOS
-#   (linux: sed -i "s/^CAPTURE_TOKEN=.*/CAPTURE_TOKEN=$(openssl rand -hex 24)/" .env)
+Want to change the Miniflux admin login first? Set `ADMIN_USERNAME` /
+`ADMIN_PASSWORD` in `.env` before the first run.
 
-# 2. start the feed engine
-docker compose up -d db miniflux
-#    open http://localhost:8080  (first-run admin: admin / changeme123 — change it)
-#    Settings -> API Keys -> Create API Key -> copy it
-
-# 3. write the miniflux token into .env
-sed -i '' "s/^MINIFLUX_TOKEN=.*/MINIFLUX_TOKEN=PASTE_TOKEN/" .env
-
-# 4. build + start the reader
-docker compose up -d --build web
-```
-
-- Reader: <http://localhost:3000>
+- Reader: <http://localhost:3000> (or `http://SERVER_IP:3000`)
 - Add feeds with the **+** in the reader, or in Miniflux.
 
 That's the base install — free feeds work immediately. For paywalled full text,
