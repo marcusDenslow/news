@@ -81,6 +81,7 @@
   --font-serif-stack: var(--font-newsreader), "New York", "Iowan Old Style",
     Georgia, "Times New Roman", serif;
   --font-display-stack: var(--font-fraunces), "Fraunces", "New York", Georgia, serif;
+  --font-cine-stack: var(--font-instrument), "Instrument Serif", "New York", Georgia, serif;
 
   --news-accent: #f23a2e;
   --news-accent-press: #d12a1f;
@@ -143,12 +144,16 @@
     @apply font-sans;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    overflow-x: hidden;
+    /* clip, not hidden: hidden forces overflow-y:auto → makes html/body/.app
+       scroll containers, which breaks the sticky sidebar (it sticks to the
+       page-tall .app instead of the viewport). clip still hides horizontal
+       overflow but leaves sticky resolving against the viewport. */
+    overflow-x: clip;
     max-width: 100%;
   }
   body {
     @apply bg-background text-foreground;
-    overflow-x: hidden;
+    overflow-x: clip;
     overscroll-behavior-y: none;
   }
   ::selection {
@@ -182,7 +187,7 @@
   display: flex;
   min-height: 100dvh;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 .scroll-lock {
   overflow: hidden;
@@ -1424,7 +1429,12 @@
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: var(--background);
+  /* Matches the cinematic reader surface so the covered feed reads as one sheet
+     — warm paper in light mode, near-black in dark. */
+  background: #f6f3ec;
+}
+.dark .reader-backdrop {
+  background: #0b0b0d;
 }
 .reader {
   position: fixed;
@@ -1806,4 +1816,418 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* ===================================================================== */
+/*  Cinematic reader  (imported from Claude Design — "News Reader" 1b)    */
+/*  A dark theater: full-bleed parallax hero, Instrument Serif headline   */
+/*  overlaid on the image, warm-gold accents, glass controls, glass dock. */
+/*  Palette is hard-set so it reads identically under a light or dark app.*/
+/* ===================================================================== */
+
+.reader--cine {
+  /* Fixed gold + dark glass used on the *floating chrome* and over the photo
+     hero — always sits on a dark scrim/pill, so it reads on a light or dark
+     page unchanged. */
+  --cine-gold: #d9b98a;
+  --cine-glass: rgba(24, 24, 28, 0.42);
+  /* Theme-aware page surface. Light is the default; .dark flips it below, so a
+     light-mode feed opens a warm-paper cinematic reader and a dark feed opens
+     the dark theater. */
+  --cine-bg: #f6f3ec;
+  --cine-title: #1b160f;
+  --cine-body: rgba(38, 32, 24, 0.9);
+  --cine-muted: rgba(38, 32, 24, 0.55);
+  --cine-accent: #b4532a;
+  --cine-hairline: rgba(20, 15, 8, 0.12);
+  --cine-code: rgba(20, 15, 8, 0.05);
+  background: var(--cine-bg);
+  color: var(--cine-body);
+  font-family: var(--font-serif-stack);
+}
+.dark .reader--cine {
+  --cine-bg: #0b0b0d;
+  --cine-title: #f4f1ea;
+  --cine-body: rgba(240, 237, 230, 0.82);
+  --cine-muted: rgba(240, 237, 230, 0.55);
+  --cine-accent: #d9b98a;
+  --cine-hairline: rgba(255, 255, 255, 0.1);
+  --cine-code: rgba(255, 255, 255, 0.06);
+}
+.reader--cine .reader__progress {
+  background: var(--cine-accent);
+}
+
+/* ----- Floating glass controls, overlaid on the hero top ----- */
+.reader__cine-bar {
+  position: sticky;
+  top: max(8px, env(safe-area-inset-top, 0px));
+  z-index: 62;
+  height: 56px;
+  margin-bottom: -56px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 0 14px;
+  pointer-events: none;
+}
+.reader__cine-bar > * {
+  pointer-events: auto;
+}
+.reader__cine-gbtn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--cine-glass);
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), color 0.16s ease;
+}
+.reader__cine-gbtn:active {
+  transform: scale(0.92);
+}
+.reader__cine-gbtn[data-on="true"] {
+  color: var(--cine-gold);
+}
+
+/* ----- Full-bleed parallax hero ----- */
+.reader__cine-herowrap {
+  position: relative;
+  height: clamp(440px, 72vh, 720px);
+  overflow: hidden;
+  background: var(--cine-bg);
+}
+.reader__cine-hero {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--cine-bg);
+}
+/* Oversized image layer that lags behind the scroll (parallax). The overhang
+   keeps the edges covered as it translates + scales. */
+.reader__cine-heroimg {
+  position: absolute;
+  inset: -160px 0 0 0;
+  transform-origin: 50% 0;
+  will-change: transform;
+}
+.reader__cine-heroimg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.reader__cine-heroimg[data-failed="true"] {
+  background: radial-gradient(130% 80% at 78% 12%, #d9b98a 0%, rgba(217, 185, 138, 0) 46%),
+    radial-gradient(120% 90% at 12% 88%, #07171c 0%, rgba(7, 23, 28, 0) 66%),
+    linear-gradient(168deg, #8c6b4a 0%, #2e4c4e 44%, #0a1a20 100%);
+}
+.reader__cine-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* Fades the photo into the page colour at the bottom — paper in light mode
+     (a soft white hue), near-black in dark. So the image always blends into the
+     body below, and the lower band backs the headline in whichever direction
+     the theme needs. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--cine-bg) 18%, transparent) 0%,
+    transparent 28%,
+    transparent 40%,
+    color-mix(in oklch, var(--cine-bg) 42%, transparent) 58%,
+    color-mix(in oklch, var(--cine-bg) 80%, transparent) 80%,
+    var(--cine-bg) 100%
+  );
+}
+
+/* Headline block, pinned to the bottom of the hero. Not a child of the morphing
+   hero box, so it fades up cleanly while the image expands underneath. */
+.reader__cine-meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 0 clamp(20px, 4vw, 64px) 26px;
+  max-width: 860px;
+}
+.reader__cine-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cine-accent);
+  text-shadow: 0 1px 14px var(--cine-bg);
+}
+.reader__cine-kicker span.rule {
+  width: 22px;
+  height: 1px;
+  background: var(--cine-accent);
+  opacity: 0.6;
+}
+.reader__cine-title {
+  margin: 14px 0 0;
+  font-family: var(--font-cine-stack);
+  font-weight: 400;
+  font-size: clamp(34px, 6.2vw, 58px);
+  line-height: 1.02;
+  letter-spacing: 0.004em;
+  color: var(--cine-title);
+  text-wrap: balance;
+  /* Glow in the page colour: a white halo lifts a dark headline off a bright
+     photo in light mode; a black halo does the same for a white headline in
+     dark mode. Backing + text always contrast because both track the theme. */
+  text-shadow: 0 1px 3px color-mix(in oklch, var(--cine-bg) 55%, transparent),
+    0 2px 30px var(--cine-bg);
+}
+.reader__cine-byline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 18px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--cine-muted);
+  text-shadow: 0 1px 12px var(--cine-bg);
+}
+.reader__cine-byline .dot {
+  opacity: 0.4;
+}
+.reader__cine-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex: none;
+  background: linear-gradient(135deg, #c98a5b, #7a4a2b);
+}
+
+/* Text-only entries (no image): same headline, on a warm-lit dark panel. */
+.reader__cine-txthead {
+  position: relative;
+  padding: 104px clamp(20px, 4vw, 64px) 8px;
+  max-width: 860px;
+  margin: 0 auto;
+  background: radial-gradient(
+    120% 80% at 82% 0%,
+    rgba(217, 185, 138, 0.14) 0%,
+    rgba(217, 185, 138, 0) 58%
+  );
+}
+/* No photo behind the headline here, so it sits on the page surface and must
+   follow the theme (dark ink on paper / cream on black) instead of the fixed
+   over-photo white. */
+.reader__cine-txthead .reader__cine-title {
+  color: var(--cine-title);
+  text-shadow: none;
+}
+.reader__cine-txthead .reader__cine-kicker,
+.reader__cine-txthead .reader__cine-kicker .rule {
+  color: var(--cine-accent);
+}
+.reader__cine-txthead .reader__cine-kicker .rule {
+  background: var(--cine-accent);
+}
+.reader__cine-txthead .reader__cine-byline {
+  color: var(--cine-muted);
+}
+
+/* ----- Body ----- */
+.reader__cine-article {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 16px 24px 96px;
+}
+@media (max-width: 680px) {
+  .reader__cine-article {
+    padding: 14px 20px 96px;
+  }
+}
+/* Inline "read full article" control — restored above the body, out of the
+   bottom dock. Gold-tinted pill, divider underneath. */
+.reader__cine-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--cine-hairline);
+}
+.reader__cine-fulltext {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cine-accent);
+  background: color-mix(in oklch, var(--cine-accent) 12%, transparent);
+  border: 0.5px solid color-mix(in oklch, var(--cine-accent) 24%, transparent);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.reader__cine-fulltext:hover {
+  background: color-mix(in oklch, var(--cine-accent) 20%, transparent);
+}
+.reader__cine-fulltext:active {
+  transform: scale(0.96);
+}
+.reader__cine-fulltext:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.reader--cine .article-body {
+  font-family: var(--font-serif-stack);
+  font-weight: 300;
+  font-size: 18.5px;
+  line-height: 1.72;
+  color: var(--cine-body);
+  padding-top: 0;
+}
+/* Lead paragraph opens brighter + a touch larger, no drop cap in this cut. */
+.reader--cine .article-body > p:first-of-type {
+  font-size: 20.5px;
+  line-height: 1.58;
+  color: var(--cine-title);
+}
+.reader--cine .article-body > p:first-of-type::first-letter {
+  initial-letter: normal;
+  -webkit-initial-letter: normal;
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  color: inherit;
+  float: none;
+  margin: 0;
+}
+.reader--cine .article-body a {
+  color: var(--cine-accent);
+  text-decoration-color: color-mix(in oklch, var(--cine-accent) 45%, transparent);
+}
+.reader--cine .article-body :is(h1, h2, h3, h4) {
+  font-family: var(--font-cine-stack);
+  font-weight: 400;
+  letter-spacing: 0.004em;
+  color: var(--cine-title);
+}
+/* Any quote in the source HTML gets the tinted-glass card treatment — gold on
+   the dark theater, warm rust on the light paper (both via the accent token). */
+.reader--cine .article-body blockquote {
+  margin: 2em 0;
+  padding: 24px 24px;
+  border: 0.5px solid color-mix(in oklch, var(--cine-accent) 26%, transparent);
+  border-radius: 20px;
+  background: linear-gradient(
+    150deg,
+    color-mix(in oklch, var(--cine-accent) 12%, transparent),
+    color-mix(in oklch, var(--cine-accent) 4%, transparent)
+  );
+  font-family: var(--font-cine-stack);
+  font-style: italic;
+  font-size: 24px;
+  line-height: 1.32;
+  color: var(--cine-title);
+}
+.reader--cine .article-body figcaption {
+  color: var(--cine-muted);
+}
+.reader--cine .article-body :is(pre, code) {
+  background: var(--cine-code);
+  color: var(--cine-title);
+}
+.reader--cine .article-body img,
+.reader--cine .article-body video,
+.reader--cine .article-body iframe {
+  background: var(--cine-code);
+}
+.reader--cine .article-body hr {
+  border-top-color: var(--cine-hairline);
+}
+.reader--cine .article-body :is(th, td) {
+  border-color: var(--cine-hairline);
+}
+.reader--cine .article-body .shimmer {
+  background: var(--cine-code);
+}
+
+/* ----- Vertical action rail (top-right) — Listen / Bookmark / Open ----- */
+.reader__cine-rail {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(26, 26, 30, 0.5);
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+}
+.reader__cine-railbtn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: rgba(244, 241, 234, 0.92);
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.16s ease, color 0.16s ease;
+}
+.reader__cine-railbtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  transform: scale(1.08);
+}
+.reader__cine-railbtn:active {
+  transform: scale(0.9);
+}
+.reader__cine-railbtn[data-on="true"] {
+  color: var(--cine-gold);
+}
+/* Label slides out to the left on hover. */
+.reader__cine-railbtn::after {
+  content: attr(data-label);
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(6px);
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(26, 26, 30, 0.7);
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reader__cine-railbtn:hover::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
 }

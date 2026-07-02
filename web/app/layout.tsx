@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Newsreader, Fraunces } from "next/font/google";
+import { Newsreader, Fraunces, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
@@ -17,6 +17,15 @@ const fraunces = Fraunces({
   subsets: ["latin"],
   display: "swap",
   style: ["normal", "italic"],
+});
+
+// Airy high-contrast serif for the cinematic reader headline + pull-quotes.
+const instrument = Instrument_Serif({
+  variable: "--font-instrument",
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -41,7 +50,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${newsreader.variable} ${fraunces.variable} h-full`}
+      className={`${newsreader.variable} ${fraunces.variable} ${instrument.variable} h-full`}
     >
       <body className="min-h-full">
         <Providers>{children}</Providers>

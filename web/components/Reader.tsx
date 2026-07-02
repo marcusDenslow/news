@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   motion,
   useScroll,
+  useTransform,
   useReducedMotion,
   usePresence,
   animate,
@@ -17,15 +18,21 @@ import {
   Loader2,
   Sparkles,
   Undo2,
+  Headphones,
+  Square,
 } from "lucide-react";
 import type { CardEntry, FullEntry } from "@/lib/types";
-import { imgProxy, feedColor, fullDate, readingTimeLabel, jsonFetcher } from "@/lib/format";
-import { Favicon, MediaImg } from "@/components/Img";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { imgProxy, readingTimeLabel, jsonFetcher } from "@/lib/format";
+import { MediaImg } from "@/components/Img";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const EASE_IN = [0.4, 0, 0.28, 1] as const;
+
+function shortDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 function processHtml(html: string): string {
   if (typeof window === "undefined" || !html) return html ?? "";
@@ -72,11 +79,24 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
   const { scrollYProgress } = useScroll({ container: scrollRef });
   const reduce = useReducedMotion();
 
+  // ---- Hero parallax --------------------------------------------------------
+  // The image layer lags the scroll (translates down + scales up) as the hero
+  // slides out of view. Measured against the hero *wrapper* (a stable flow box);
+  // the inner hero morphs via FLIP, so it can't be the scroll target.
+  const herowrapRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: heroP } = useScroll({
+    target: herowrapRef,
+    container: scrollRef,
+    offset: ["start start", "end start"],
+  });
+  const heroY = useTransform(heroP, [0, 1], [0, 140]);
+  const heroScale = useTransform(heroP, [0, 1], [1.06, 1.16]);
+
   // ---- Single-element hero morph -------------------------------------------
-  // One <img> box flies from the card's on-screen rect into the hero and back.
-  // No shared-layout crossfade — there is only ever this one element in flight,
-  // so the eye tracks it cleanly. The page is scroll-locked while open, so the
-  // captured `origin` rect stays valid for the collapse on close.
+  // One box flies from the card's on-screen rect into the full-bleed hero and
+  // back. No shared-layout crossfade — there is only ever this one element in
+  // flight, so the eye tracks it cleanly. The page is scroll-locked while open,
+  // so the captured `origin` rect stays valid for the collapse on close.
   const heroRef = useRef<HTMLDivElement>(null);
   const flipRef = useRef<{ dx: number; dy: number; sx: number; sy: number } | null>(null);
   const [isPresent, safeToRemove] = usePresence();
@@ -108,8 +128,8 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
         scaleX: [flip.sx, 1],
         scaleY: [flip.sy, 1],
         // Radius is scaled by the transform, so counter-scale it: 16/sx renders
-        // as ~16px (the card radius) at the shrunk end, 30px at full size.
-        borderRadius: [`${16 / flip.sx}px`, "30px"],
+        // as ~16px (the card radius) at the shrunk end, 0 at the full-bleed end.
+        borderRadius: [`${16 / flip.sx}px`, "0px"],
       },
       { duration: 0.56, ease: EASE }
     );
@@ -134,15 +154,15 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
         y: [0, flip.dy],
         scaleX: [1, flip.sx],
         scaleY: [1, flip.sy],
-        borderRadius: ["30px", `${16 / flip.sx}px`],
+        borderRadius: ["0px", `${16 / flip.sx}px`],
       },
       { duration: 0.44, ease: EASE_IN }
     ).then(() => safeToRemove?.());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPresent]);
 
-  // Reader text settles in after the hero has begun its flight, then leaves in a
-  // quick downward cascade. Reduced motion collapses it all to a plain cut.
+  // Headline + body settle in after the hero has begun its flight, then leave in
+  // a quick downward cascade. Reduced motion collapses it all to a plain cut.
   const containerV: Variants = {
     hidden: {},
     show: {
@@ -169,6 +189,7 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
   const [fullHtml, setFullHtml] = useState<string | null>(null);
   const [showingFull, setShowingFull] = useState(false);
   const [loadingFull, setLoadingFull] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
 
   // Lock the page behind the reader.
   useEffect(() => {
@@ -184,6 +205,9 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // Never leave the article reading aloud after the reader is gone.
+  useEffect(() => () => window.speechSynthesis?.cancel(), []);
 
   const baseHtml = data?.content ?? "";
   const displayedHtml = showingFull && fullHtml != null ? fullHtml : baseHtml;
@@ -207,8 +231,59 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
     }
   }
 
-  const color = feedColor(entry.feedId);
+  // Vocal reader — native Web Speech API (SpeechSynthesis). Zero-dependency
+  // baseline; reads the currently displayed text (summary or full article).
+  function toggleListen() {
+    const synth = typeof window !== "undefined" ? window.speechSynthesis : undefined;
+    if (!synth) return;
+    if (speaking) {
+      synth.cancel();
+      setSpeaking(false);
+      return;
+    }
+    const tmp = document.createElement("div");
+    tmp.innerHTML = processed;
+    const text = `${entry.title}. ${tmp.textContent ?? ""}`.replace(/\s+/g, " ").trim();
+    if (!text) return;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 1;
+    utter.onend = () => setSpeaking(false);
+    utter.onerror = () => setSpeaking(false);
+    synth.cancel();
+    synth.speak(utter);
+    setSpeaking(true);
+  }
+
   const author = entry.author?.trim();
+  const heroImgStyle = reduce ? undefined : { y: heroY, scale: heroScale };
+
+  const Meta = (
+    <>
+      <motion.div variants={itemV} className="reader__cine-kicker">
+        <span>{entry.feedTitle}</span>
+        <span className="rule" />
+      </motion.div>
+      <motion.h1 variants={itemV} className="reader__cine-title">
+        {entry.title}
+      </motion.h1>
+      <motion.div variants={itemV} className="reader__cine-byline">
+        <span className="reader__cine-avatar" aria-hidden />
+        {author && (
+          <>
+            <span>{author}</span>
+            <span className="dot" />
+          </>
+        )}
+        {entry.readingTime > 0 && (
+          <>
+            <span>{readingTimeLabel(entry.readingTime)}</span>
+            <span className="dot" />
+          </>
+        )}
+        <span>{shortDate(entry.publishedAt)}</span>
+      </motion.div>
+    </>
+  );
 
   return (
     <>
@@ -221,137 +296,111 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
         onClick={onClose}
       />
 
-      <motion.div className="reader" ref={scrollRef}>
-        {entry.image && (
-          <motion.div
-            className="reader__ambient"
-            aria-hidden
-            style={{ backgroundImage: `url(${imgProxy(entry.image)})` }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
-          />
-        )}
+      <motion.div className="reader reader--cine" ref={scrollRef}>
         <motion.div className="reader__progress" style={{ scaleX: scrollYProgress, width: "100%" }} />
 
+        {/* Floating glass controls, over the hero. Back on the left; a vertical
+            action rail on the right (Listen / Bookmark / Open). */}
         <motion.div
-          className="reader__bar"
+          className="reader__cine-bar"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full reader__back group/back"
-                onClick={onClose}
-                aria-label="Back"
-              >
-                <motion.span
-                  className="reader__back-twirl"
-                  whileHover={{ rotate: -375 }}
-                  transition={{ type: "spring", stiffness: 200, damping: 14 }}
-                >
-                  <ArrowLeft className="size-5" />
-                </motion.span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Back (Esc)</TooltipContent>
-          </Tooltip>
+          <button
+            type="button"
+            className="reader__cine-gbtn"
+            onClick={onClose}
+            aria-label="Back"
+            title="Back (Esc)"
+          >
+            <ArrowLeft className="size-[18px]" />
+          </button>
 
-          <div className="reader__bar-spacer" />
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full"
-                onClick={() => onToggleStar(entry)}
-                style={{ color: entry.starred ? "var(--news-accent)" : undefined }}
-              >
-                <Star className="size-5" fill={entry.starred ? "currentColor" : "none"} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{entry.starred ? "Bookmarked" : "Bookmark"}</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full" asChild>
-                <a href={entry.url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="size-5" />
-                </a>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Open original</TooltipContent>
-          </Tooltip>
+          <div className="reader__cine-rail">
+            <button
+              type="button"
+              className="reader__cine-railbtn"
+              data-on={speaking || undefined}
+              data-label={speaking ? "Stop" : "Listen"}
+              onClick={toggleListen}
+              aria-pressed={speaking}
+              aria-label={speaking ? "Stop reading" : "Listen"}
+            >
+              {speaking ? (
+                <Square className="size-[15px]" fill="currentColor" />
+              ) : (
+                <Headphones className="size-[18px]" />
+              )}
+            </button>
+            <button
+              type="button"
+              className="reader__cine-railbtn"
+              data-on={entry.starred || undefined}
+              data-label={entry.starred ? "Bookmarked" : "Bookmark"}
+              onClick={() => onToggleStar(entry)}
+              aria-label={entry.starred ? "Bookmarked" : "Bookmark"}
+            >
+              <Star className="size-[18px]" fill={entry.starred ? "currentColor" : "none"} />
+            </button>
+            <a
+              className="reader__cine-railbtn"
+              data-label="Open original"
+              href={entry.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open original"
+            >
+              <ExternalLink className="size-[17px]" />
+            </a>
+          </div>
         </motion.div>
 
-        {entry.image && (
-          // Driven imperatively (see the layout effects above): flies from the
-          // card's rect on open, collapses back on close. Plain div — it must not
-          // be under Motion's layout system or the flight fights the projection.
-          // The hero box takes the source card's aspect ratio so the morph is a
-          // clean uniform scale (see .reader__hero); default 16:10 for briefs.
-          <div
-            className="reader__hero"
-            ref={heroRef}
-            style={
-              {
-                "--hero-aspect":
-                  origin && origin.height > 0 ? origin.width / origin.height : undefined,
-                ...(!origin && !reduce ? { opacity: 0 } : null),
-              } as React.CSSProperties
-            }
-          >
-            <MediaImg src={entry.image} eager />
+        {entry.image ? (
+          <div className="reader__cine-herowrap" ref={herowrapRef}>
+            {/* Morphs from the card rect (see the layout effects). Plain div — it
+                must not be under Motion's layout system or the flight fights the
+                projection. */}
+            <div className="reader__cine-hero" ref={heroRef}>
+              <motion.div className="reader__cine-heroimg" style={heroImgStyle}>
+                <MediaImg src={entry.image} eager />
+              </motion.div>
+              <div className="reader__cine-scrim" />
+            </div>
+            <motion.div
+              className="reader__cine-meta"
+              variants={containerV}
+              initial="hidden"
+              animate="show"
+              exit="exit"
+            >
+              {Meta}
+            </motion.div>
           </div>
+        ) : (
+          <motion.div
+            className="reader__cine-txthead"
+            variants={containerV}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+          >
+            {Meta}
+          </motion.div>
         )}
 
         <motion.article
-          className="reader__article"
+          className="reader__cine-article"
           variants={containerV}
           initial="hidden"
           animate="show"
           exit="exit"
         >
-          <motion.div
-            variants={itemV}
-            className="reader__kicker"
-            style={{ "--feed": color } as React.CSSProperties}
-          >
-            <Favicon feedId={entry.feedId} />
-            <span>{entry.feedTitle}</span>
-          </motion.div>
-
-          <motion.h1 variants={itemV} className="reader__title">
-            {entry.title}
-          </motion.h1>
-
-          <motion.div variants={itemV} className="reader__byline">
-            {author && (
-              <>
-                <span>
-                  By <strong>{author}</strong>
-                </span>
-                <span className="dot" />
-              </>
-            )}
-            <span>{fullDate(entry.publishedAt)}</span>
-            {entry.readingTime > 0 && (
-              <>
-                <span className="dot" />
-                <span>{readingTimeLabel(entry.readingTime)}</span>
-              </>
-            )}
+          <motion.div variants={itemV} className="reader__cine-tools">
             <button
               type="button"
-              className="reader__fulltext-btn"
+              className="reader__cine-fulltext"
               onClick={() => (showingFull ? setShowingFull(false) : loadFull())}
               disabled={loadingFull}
             >
@@ -367,27 +416,19 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
           </motion.div>
 
           <motion.div variants={itemV}>
-          {isLoading && !baseHtml ? (
-            <div className="article-body" aria-hidden>
-              {[92, 100, 86, 96, 70, 100, 88].map((w, i) => (
-                <div
-                  key={i}
-                  className="shimmer"
-                  style={{
-                    height: 18,
-                    width: `${w}%`,
-                    borderRadius: 6,
-                    margin: "0 0 16px",
-                  }}
-                />
-              ))}
-            </div>
-          ) : (
-            <div
-              className="article-body"
-              dangerouslySetInnerHTML={{ __html: processed }}
-            />
-          )}
+            {isLoading && !baseHtml ? (
+              <div className="article-body" aria-hidden>
+                {[92, 100, 86, 96, 70, 100, 88].map((w, i) => (
+                  <div
+                    key={i}
+                    className="shimmer"
+                    style={{ height: 18, width: `${w}%`, borderRadius: 6, margin: "0 0 16px" }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="article-body" dangerouslySetInnerHTML={{ __html: processed }} />
+            )}
           </motion.div>
         </motion.article>
       </motion.div>
