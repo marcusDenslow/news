@@ -27,6 +27,80 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 const EASE = [0.22, 1, 0.36, 1] as const;
 const EASE_IN = [0.4, 0, 0.28, 1] as const;
 
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  switch (max) {
+    case r:
+      h = (g - b) / d + (g < b ? 6 : 0);
+      break;
+    case g:
+      h = (b - r) / d + 2;
+      break;
+    default:
+      h = (r - g) / d + 4;
+  }
+  return [h * 60, s, l];
+}
+
+// Samples the hero photo down to a handful of pixels and averages them into
+// one hue — the "extracted color" that drives the page wash below, the way
+// Apple Music or Spotify tint a now-playing screen from the album art. The
+// image proxy (/api/img) always serves same-origin, so canvas reads cleanly.
+function useHeroGlow(src: string | null | undefined): string | null {
+  const [glow, setGlow] = useState<string | null>(null);
+  useEffect(() => {
+    if (!src) return;
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const canvas = document.createElement("canvas");
+        const size = 32;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, size, size);
+        const { data } = ctx.getImageData(0, 0, size, size);
+        let r = 0,
+          g = 0,
+          b = 0,
+          n = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] < 128) continue;
+          r += data[i];
+          g += data[i + 1];
+          b += data[i + 2];
+          n++;
+        }
+        if (!n || cancelled) return;
+        const [h, s] = rgbToHsl(r / n, g / n, b / n);
+        // Raw photo averages skew muddy — push into a range that still reads
+        // as a confident, glowing color once it's spread across a big wash.
+        const glowS = Math.round(Math.max(s, 0.42) * 100);
+        setGlow(`${Math.round(h)} ${glowS}% 38%`);
+      } catch {
+        // Canvas read failed (unexpected cross-origin edge case) — no glow.
+      }
+    };
+    img.src = imgProxy(src);
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+  return glow;
+}
+
 function processHtml(html: string): string {
   if (typeof window === "undefined" || !html) return html ?? "";
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -209,6 +283,7 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
 
   const color = feedColor(entry.feedId);
   const author = entry.author?.trim();
+  const glow = useHeroGlow(entry.image);
 
   return (
     <>
@@ -221,7 +296,11 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
         onClick={onClose}
       />
 
-      <motion.div className="reader" ref={scrollRef}>
+      <motion.div
+        className="reader"
+        ref={scrollRef}
+        style={glow ? ({ "--hero-glow": glow } as React.CSSProperties) : undefined}
+      >
         {entry.image && (
           <motion.div
             className="reader__ambient"
@@ -231,6 +310,20 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
+          />
+        )}
+        {glow && (
+          // The extracted photo color, spread as a designed wash that reaches
+          // well past the hero — this is what actually reads as "the page is
+          // tinted by the photo," where the blurred-image ambient above is
+          // too soft and too short on its own to carry that on its own.
+          <motion.div
+            className="reader__glow"
+            aria-hidden
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.7 }}
           />
         )}
         <motion.div className="reader__progress" style={{ scaleX: scrollYProgress, width: "100%" }} />
