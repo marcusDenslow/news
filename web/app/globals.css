@@ -1467,7 +1467,7 @@
 .dark .reader__ambient {
   opacity: 0.5;
 }
-.reader__hero,
+.reader__heroSection,
 .reader__article {
   position: relative;
   z-index: 1;
@@ -1494,6 +1494,17 @@
   background: transparent;
   pointer-events: none;
 }
+@media (max-width: 680px) {
+  /* Collapse the bar's own flow height so the hero image can reach the true
+     top of the page — the buttons (pointer-events re-enabled below) then
+     float on top of it as frosted chips, same trick as iOS/Apple News. */
+  .reader__bar {
+    height: 0;
+    align-items: flex-start;
+    padding-top: 14px;
+    overflow: visible;
+  }
+}
 .reader__bar > * {
   pointer-events: auto;
 }
@@ -1517,20 +1528,27 @@
   width: 100%;
   height: 100%;
 }
+/* The section wraps the morphing image plus its scrim/title overlay and clips
+   all three to one shared rounded rect — mirrors the front-page .hero card
+   (see Card.tsx Hero / .hero__scrim) so the reader feels like the same
+   product, not a bolted-on text page. */
+.reader__heroSection {
+  position: relative;
+  width: min(100%, 1100px, calc(74vh * var(--hero-aspect, 1.6)));
+  margin: 14px auto 0;
+  border-radius: var(--r-lead);
+  overflow: hidden;
+  background: var(--muted);
+}
 .reader__hero {
   position: relative;
   /* Adopt the *source card's* exact aspect ratio (--hero-aspect, set inline from
      the captured origin rect) so the shared-element morph is a pure uniform scale
      with a matching cover-crop — no squash and no aspect snap when the reader hero
-     is removed and the card underneath is revealed. Height is capped by clamping
-     the width (74vh * aspect), so the cap never distorts the ratio the way a bare
-     max-height did. */
+     is removed and the card underneath is revealed. */
   --hero-aspect: 1.6;
-  width: min(100%, 1100px, calc(74vh * var(--hero-aspect)));
-  margin: 14px auto 0;
+  width: 100%;
   aspect-ratio: var(--hero-aspect);
-  overflow: hidden;
-  border-radius: var(--r-lead);
   background: var(--muted);
 }
 .reader__hero img {
@@ -1539,10 +1557,49 @@
   object-fit: cover;
   display: block;
 }
+/* Bottom-up scrim so the overlaid title stays legible over any photo, same
+   recipe as the front-page hero card. */
+.reader__heroScrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.82) 0%,
+    rgba(0, 0, 0, 0.46) 30%,
+    rgba(0, 0, 0, 0.05) 62%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+.reader__heroText {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: clamp(20px, 4vw, 40px) clamp(20px, 4vw, 40px) clamp(22px, 4vw, 32px);
+  max-width: 760px;
+}
+.reader__heroText .reader__kicker {
+  color: #fff;
+}
+.reader__heroText .reader__kicker img {
+  background: #fff;
+}
+.reader__heroText .reader__title {
+  margin-top: 10px;
+  color: #fff;
+  text-shadow: 0 1px 36px rgba(0, 0, 0, 0.4), 0 2px 10px rgba(0, 0, 0, 0.35);
+}
 @media (max-width: 680px) {
-  .reader__hero {
+  .reader__heroSection {
+    width: 100%;
     margin: 0;
     border-radius: 0;
+  }
+  .reader__hero {
+    aspect-ratio: 1;
   }
 }
 .reader__article {
@@ -1553,6 +1610,16 @@
 @media (max-width: 680px) {
   .reader__article {
     padding: 28px 20px 120px;
+  }
+}
+/* Kicker + title already live in .reader__heroText for image articles — the
+   article body just needs less lead-in before the byline. */
+.reader__article--media {
+  padding-top: 24px;
+}
+@media (max-width: 680px) {
+  .reader__article--media {
+    padding-top: 20px;
   }
 }
 .reader__kicker {

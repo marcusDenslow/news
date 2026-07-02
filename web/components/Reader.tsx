@@ -293,45 +293,73 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
         </motion.div>
 
         {entry.image && (
-          // Driven imperatively (see the layout effects above): flies from the
-          // card's rect on open, collapses back on close. Plain div — it must not
-          // be under Motion's layout system or the flight fights the projection.
-          // The hero box takes the source card's aspect ratio so the morph is a
-          // clean uniform scale (see .reader__hero); default 16:10 for briefs.
-          <div
-            className="reader__hero"
-            ref={heroRef}
-            style={
-              {
-                "--hero-aspect":
-                  origin && origin.height > 0 ? origin.width / origin.height : undefined,
-                ...(!origin && !reduce ? { opacity: 0 } : null),
-              } as React.CSSProperties
-            }
-          >
-            <MediaImg src={entry.image} eager />
+          <div className="reader__heroSection">
+            {/* Driven imperatively (see the layout effects above): flies from the
+                card's rect on open, collapses back on close. Plain div — it must not
+                be under Motion's layout system or the flight fights the projection.
+                The hero box takes the source card's aspect ratio so the morph is a
+                clean uniform scale (see .reader__hero); default 16:10 for briefs.
+                The scrim + title live outside this element so they never get
+                caught in that transform — they just fade in over the final box. */}
+            <div
+              className="reader__hero"
+              ref={heroRef}
+              style={
+                {
+                  "--hero-aspect":
+                    origin && origin.height > 0 ? origin.width / origin.height : undefined,
+                  ...(!origin && !reduce ? { opacity: 0 } : null),
+                } as React.CSSProperties
+              }
+            >
+              <MediaImg src={entry.image} eager />
+            </div>
+            <div className="reader__heroScrim" aria-hidden />
+            <motion.div
+              className="reader__heroText"
+              variants={containerV}
+              initial="hidden"
+              animate="show"
+              exit="exit"
+            >
+              <motion.div
+                variants={itemV}
+                className="reader__kicker"
+                style={{ "--feed": color } as React.CSSProperties}
+              >
+                <Favicon feedId={entry.feedId} />
+                <span>{entry.feedTitle}</span>
+              </motion.div>
+              <motion.h1 variants={itemV} className="reader__title">
+                {entry.title}
+              </motion.h1>
+            </motion.div>
           </div>
         )}
 
         <motion.article
-          className="reader__article"
+          className={`reader__article${entry.image ? " reader__article--media" : ""}`}
           variants={containerV}
           initial="hidden"
           animate="show"
           exit="exit"
         >
-          <motion.div
-            variants={itemV}
-            className="reader__kicker"
-            style={{ "--feed": color } as React.CSSProperties}
-          >
-            <Favicon feedId={entry.feedId} />
-            <span>{entry.feedTitle}</span>
-          </motion.div>
+          {!entry.image && (
+            <>
+              <motion.div
+                variants={itemV}
+                className="reader__kicker"
+                style={{ "--feed": color } as React.CSSProperties}
+              >
+                <Favicon feedId={entry.feedId} />
+                <span>{entry.feedTitle}</span>
+              </motion.div>
 
-          <motion.h1 variants={itemV} className="reader__title">
-            {entry.title}
-          </motion.h1>
+              <motion.h1 variants={itemV} className="reader__title">
+                {entry.title}
+              </motion.h1>
+            </>
+          )}
 
           <motion.div variants={itemV} className="reader__byline">
             {author && (
