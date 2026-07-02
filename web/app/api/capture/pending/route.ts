@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listEntries } from "@/lib/miniflux";
+import { entriesForDomains } from "@/lib/premiumEntries";
 import { hasCapture } from "@/lib/captureStore";
 
 // hasCapture touches the filesystem store — Node runtime.
@@ -8,16 +8,9 @@ export const runtime = "nodejs";
 const TOKEN = process.env.CAPTURE_TOKEN ?? "";
 const DEFAULT_USER = "default";
 
-function hostOf(u: string): string {
-  try {
-    return new URL(u).hostname.toLowerCase().replace(/^www\./, "");
-  } catch {
-    return "";
-  }
-}
-
-// Tells the extension which recent articles from the given (premium) domains are
-// still missing full text, so it can backfill them from the user's session.
+// Tells the extension which articles from the given (premium) domains are still
+// missing full text, so it can backfill them from the user's session. Gathered
+// per-feed, so a high-volume feed can't bury a paywalled one.
 export async function GET(req: NextRequest) {
   if (!TOKEN) {
     return NextResponse.json({ error: "capture disabled" }, { status: 503 });
@@ -36,14 +29,12 @@ export async function GET(req: NextRequest) {
   if (!domains.size) return NextResponse.json({ pending: [] });
 
   const limit = Math.min(Number(req.nextUrl.searchParams.get("limit")) || 20, 50);
-  const scan = Math.min(Number(req.nextUrl.searchParams.get("scan")) || 150, 300);
+  const candidates = await entriesForDomains(domains);
 
-  const { entries } = await listEntries({ limit: scan });
   const pending: { url: string; title: string }[] = [];
-  for (const e of entries) {
+  for (const c of candidates) {
     if (pending.length >= limit) break;
-    if (!domains.has(hostOf(e.url))) continue;
-    if (!(await hasCapture(DEFAULT_USER, e.url))) pending.push({ url: e.url, title: e.title });
+    if (!(await hasCapture(DEFAULT_USER, c.url))) pending.push(c);
   }
 
   return NextResponse.json({ pending });

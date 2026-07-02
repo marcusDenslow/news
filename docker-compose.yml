@@ -11,6 +11,7 @@ services:
       test: ["CMD", "pg_isready", "-U", "miniflux"]
       interval: 5s
       retries: 10
+    restart: unless-stopped
 
   miniflux:
     image: miniflux/miniflux:latest
@@ -25,6 +26,7 @@ services:
       CREATE_ADMIN: "1"
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: changeme123
+    restart: unless-stopped
 
   web:
     build: ./web

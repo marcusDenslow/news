@@ -11,6 +11,7 @@ export async function register() {
 
   const { backfillTick } = await import("./lib/serverBackfill");
   const periodMs = Math.max(5, Number(process.env.NEWSHUB_BACKFILL_MIN) || 15) * 60_000;
+  console.log("[newshub] server-side backfill worker started, every", periodMs / 60_000, "min");
 
   let running = false;
   const run = async () => {

@@ -209,6 +209,11 @@ export async function getEntry(id: number): Promise<FullEntry> {
   return toFull(await mf<RawEntry>(`/entries/${id}`));
 }
 
+export async function listFeeds(): Promise<{ id: number; siteUrl: string; feedUrl: string; title: string }[]> {
+  const feeds = await mf<RawFeed[]>("/feeds");
+  return feeds.map((f) => ({ id: f.id, siteUrl: f.site_url, feedUrl: f.feed_url, title: f.title }));
+}
+
 export async function setStatus(ids: number[], status: "read" | "unread"): Promise<void> {
   await mf<void>("/entries", {
     method: "PUT",
