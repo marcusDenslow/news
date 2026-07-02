@@ -261,6 +261,63 @@ export function App() {
     [filter, mutate, mutateTree]
   );
 
+  const moveFeedToCategory = useCallback(
+    (feedId: number, toCatId: number) => {
+      // Optimistically relocate the feed node (and its unread) between folders
+      // so the sidebar settles instantly; the PATCH persists it to Miniflux.
+      mutateTree((t) => {
+        if (!t) return t;
+        let moved: FeedNode | undefined;
+        const stripped = t.categories.map((c) => {
+          const f = c.feeds.find((x) => x.id === feedId);
+          if (f) {
+            moved = f;
+            return { ...c, feeds: c.feeds.filter((x) => x.id !== feedId), unread: c.unread - f.unread };
+          }
+          return c;
+        });
+        if (!moved) return t;
+        const next = stripped.map((c) =>
+          c.id === toCatId ? { ...c, feeds: [...c.feeds, moved!], unread: c.unread + moved!.unread } : c
+        );
+        return { ...t, categories: next };
+      }, { revalidate: false });
+
+      fetch(`/api/feeds/${feedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId: toCatId }),
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error();
+          mutateTree();
+        })
+        .catch(() => {
+          toast.error("Couldn’t move feed");
+          mutateTree();
+        });
+    },
+    [mutateTree]
+  );
+
+  const createFolder = useCallback(
+    async (title: string) => {
+      try {
+        const res = await fetch("/api/categories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+        if (!res.ok) throw new Error();
+        toast.success(`Folder “${title}” created`);
+        mutateTree();
+      } catch {
+        toast.error("Couldn’t create folder");
+      }
+    },
+    [mutateTree]
+  );
+
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -290,6 +347,8 @@ export function App() {
         onAddFeed={() => setAddOpen(true)}
         onMarkFeedRead={markFeedRead}
         onRemoveFeed={removeFeed}
+        onMoveFeed={moveFeedToCategory}
+        onCreateFolder={createFolder}
       />
 
       <main className="main" data-reader-open={!!selected}>

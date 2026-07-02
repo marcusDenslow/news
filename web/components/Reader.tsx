@@ -297,7 +297,7 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
       />
 
       <motion.div className="reader reader--cine" ref={scrollRef}>
-        <motion.div className="reader__progress" style={{ scaleX: scrollYProgress, width: "100%" }} />
+        <motion.div className="reader__progress" style={{ scaleX: scrollYProgress }} />
 
         {/* Floating glass controls, over the hero. Back on the left; a vertical
             action rail on the right (Listen / Bookmark / Open). */}

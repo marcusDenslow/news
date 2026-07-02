@@ -276,6 +276,14 @@ export async function createFeed(feedUrl: string, categoryId?: number): Promise<
   }
 }
 
+export async function createCategory(title: string): Promise<{ id: number; title: string }> {
+  const cat = await mf<Category>("/categories", {
+    method: "POST",
+    body: JSON.stringify({ title }),
+  });
+  return { id: cat.id, title: cat.title };
+}
+
 export async function getFeedsTree(): Promise<FeedsTree> {
   const [feeds, categories, counters] = await Promise.all([
     mf<RawFeed[]>("/feeds"),
@@ -305,8 +313,10 @@ export async function getFeedsTree(): Promise<FeedsTree> {
     });
   }
 
+  // Keep empty categories: an empty folder is still a valid drop target for the
+  // sidebar's drag-to-move. Feeds are alpha-sorted as a default; the client then
+  // applies any remembered drag order on top.
   const cats = [...byCategory.values()]
-    .filter((c) => c.feeds.length > 0)
     .map((c) => ({ ...c, feeds: c.feeds.sort((a, b) => a.title.localeCompare(b.title)) }))
     .sort((a, b) => a.title.localeCompare(b.title));
 
@@ -342,6 +352,16 @@ export async function markAllRead(p: { feedId?: number; categoryId?: number }): 
 
 export async function deleteFeed(feedId: number): Promise<void> {
   await mf<void>(`/feeds/${feedId}`, { method: "DELETE" });
+}
+
+// Move a feed into another category (folder). Miniflux has no per-feed sort
+// order, so drag-reorder within a folder is a client concern (persisted in the
+// browser); only the folder membership lives server-side.
+export async function moveFeed(feedId: number, categoryId: number): Promise<void> {
+  await mf<void>(`/feeds/${feedId}`, {
+    method: "PUT",
+    body: JSON.stringify({ category_id: categoryId }),
+  });
 }
 
 export async function getIcon(feedId: number): Promise<{ mime: string; bytes: Buffer } | null> {

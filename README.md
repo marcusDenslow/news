@@ -53,6 +53,11 @@ Requires Docker + Docker Compose.
 git clone https://github.com/marcusDenslow/news.git && cd news
 ./setup.sh
 ```
+The setup.sh script can be run with an optional --port flag. e.g.
+
+```bash
+./setup.sh --port 1234
+```
 
 `setup.sh` generates the secrets once, starts Postgres + Miniflux, mints the
 Miniflux API token automatically, and builds the reader — no manual editing, no

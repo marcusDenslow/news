@@ -92,6 +92,11 @@
   --r-chip: 24px;
   --r-img: 16px;
 
+  /* Docked sidebar width — drives the reader's left inset so, on desktop, the
+     reader expands over the *feed* while the sidebar stays put (design 4b).
+     Collapses to 0 on mobile, where the reader takes the full screen (4a). */
+  --sidebar-w: 274px;
+
   --hairline: oklch(0.2 0.02 300 / 9%);
   --shadow-card: 0 1px 2px rgba(20, 18, 28, 0.05), 0 14px 30px -12px rgba(20, 18, 28, 0.16);
   --shadow-card-hover: 0 2px 6px rgba(20, 18, 28, 0.06), 0 26px 52px -16px rgba(20, 18, 28, 0.26);
@@ -415,15 +420,16 @@
 /* ===================================================================== */
 
 .sidebar {
-  width: 274px;
+  width: var(--sidebar-w);
   flex-shrink: 0;
   position: sticky;
   top: 0;
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--sidebar);
-  border-right: 1px solid var(--hairline);
+  /* Seamless (design 2a): the sidebar shares the app canvas — no divider, no
+     separate surface. The cards carry all the contrast. */
+  background: transparent;
   z-index: 50;
 }
 .sidebar__brand {
@@ -642,139 +648,231 @@
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
-.catrow {
+/* ---- Folder tree (design 3a): absolutely-positioned rows that spring to their
+   new slot as the list reflows under a drag. -------------------------------- */
+.ftree {
+  position: relative;
+  margin-top: 2px;
+  /* height is set inline from the computed layout */
+}
+.ftree__row {
+  position: absolute;
+  left: 4px;
+  right: 4px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: 12px;
+  gap: 9px;
+  padding: 0 10px;
+  border-radius: 11px;
+  user-select: none;
+  touch-action: none;
+  z-index: 2;
+  transition: top 0.28s cubic-bezier(0.3, 1.25, 0.55, 1),
+    background 0.14s ease, box-shadow 0.2s ease, transform 0.14s ease;
 }
-.catrow__chevron {
+/* The lifted row tracks the pointer directly — no top glide, elevated + shadowed. */
+.ftree__row[data-dragged] {
+  transition: background 0.14s ease, box-shadow 0.2s ease;
+  cursor: grabbing;
+  background: var(--card);
+  box-shadow: 0 12px 30px rgba(20, 18, 28, 0.18), 0 2px 8px rgba(20, 18, 28, 0.12);
+  transform: scale(1.02);
+}
+.dark .ftree__row[data-dragged] {
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* Folder header */
+.ftree__header {
+  cursor: grab;
+}
+.ftree__header:active {
+  cursor: grabbing;
+}
+.ftree__header:hover {
+  background: var(--sidebar-accent);
+}
+.ftree__chev {
+  flex: none;
+  color: var(--muted-foreground);
+  transition: transform 0.28s cubic-bezier(0.3, 1.25, 0.55, 1);
+}
+.ftree__hname {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ftree__hcount {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: color-mix(in oklch, var(--muted-foreground) 62%, transparent);
+  white-space: nowrap;
+}
+.ftree__unread {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--news-accent);
+  font-variant-numeric: tabular-nums;
+  padding-left: 6px;
+}
+
+/* Feed row */
+.ftree__feed {
+  cursor: grab;
+  padding-left: 26px;
+}
+.ftree__feed:active {
+  cursor: grabbing;
+}
+.ftree__feed:hover {
+  background: var(--sidebar-accent);
+}
+.ftree__feed[data-active] {
+  background: color-mix(in oklch, var(--feed) 13%, transparent);
+}
+.ftree__avatar {
+  position: relative;
+  flex: none;
   display: grid;
   place-items: center;
   width: 22px;
   height: 22px;
-  color: var(--muted-foreground);
-  transition: transform 0.18s ease;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--feed, var(--news-accent));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
-.catrow__name {
-  flex: 1;
-  text-align: left;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-.catrow[data-active="true"] .catrow__name {
-  color: var(--news-accent);
-}
-.catrow__count {
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
-.feedlist {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.feedrow {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px 4px 6px;
-  border-radius: 14px;
-  transition: background 0.14s ease;
-}
-.feedrow:hover {
-  background: var(--sidebar-accent);
-}
-.feedrow[data-active="true"] {
-  background: color-mix(in oklch, var(--feed) 12%, transparent);
-}
-.feedrow__main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 5px 2px;
-  cursor: pointer;
-  text-align: left;
-}
-.feedrow__avatar {
-  position: relative;
+/* Letter behind the favicon; shows through if the icon 404s (Favicon hides itself). */
+.ftree__avatar::before {
+  content: attr(data-letter);
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--hairline);
-  transition: box-shadow 0.16s ease;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
 }
-.feedrow__favicon {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
+.ftree__favicon {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
   object-fit: cover;
 }
-.feedrow[data-active="true"] .feedrow__avatar {
-  box-shadow: 0 0 0 2px var(--feed), 0 0 0 4px color-mix(in oklch, var(--feed) 26%, transparent);
-}
-.feedrow__name {
+.ftree__fname {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.feedrow[data-active="true"] .feedrow__name {
+.ftree__feed[data-active] .ftree__fname {
   font-weight: 600;
 }
-.feedrow__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-right: 6px;
-  background: var(--feed);
+.ftree__unread--feed {
+  color: color-mix(in oklch, var(--muted-foreground) 88%, transparent);
 }
-.feedrow__more {
+.ftree__more {
+  position: absolute;
+  right: 8px;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 8px;
-  flex-shrink: 0;
   color: var(--muted-foreground);
+  background: transparent;
   opacity: 0;
   transition: opacity 0.12s ease, background 0.12s ease;
 }
-.feedrow:hover .feedrow__dot {
-  display: none;
-}
-.feedrow:hover .feedrow__more {
+.ftree__feed:hover .ftree__more {
   opacity: 1;
 }
-.feedrow__more:hover {
+.ftree__feed:hover .ftree__unread--feed {
+  opacity: 0;
+}
+.ftree__more:hover {
   background: color-mix(in oklch, var(--foreground) 10%, transparent);
   color: var(--foreground);
+}
+
+/* Drop box: the whole target folder lights up with an open slot inside it. */
+.ftree__dropbox {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  z-index: 0;
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--news-accent) 8%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--news-accent) 38%, transparent);
+  transition: top 0.22s cubic-bezier(0.3, 1.2, 0.55, 1),
+    height 0.22s cubic-bezier(0.3, 1.2, 0.55, 1);
+  pointer-events: none;
+}
+
+/* New folder */
+.ftree__newfolder {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border-radius: 11px;
+  border: 1px dashed var(--hairline);
+  color: var(--muted-foreground);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.ftree__newfolder:hover {
+  background: var(--sidebar-accent);
+  color: var(--foreground);
+}
+.ftree__newfolder--editing {
+  cursor: default;
+  border-color: color-mix(in oklch, var(--news-accent) 40%, transparent);
+  color: var(--foreground);
+}
+.ftree__newfolder input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  color: var(--foreground);
+}
+.ftree__newfolder input::placeholder {
+  color: var(--muted-foreground);
 }
 
 .sidebar__backdrop {
   display: none;
 }
 @media (max-width: 920px) {
+  /* Sidebar becomes a floating drawer → no docked column → reader goes edge to
+     edge and plays the phone open/close transition. */
+  :root {
+    --sidebar-w: 0px;
+  }
   .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
+    width: 274px;
+    /* As a floating drawer it needs its own surface again (no canvas behind it). */
+    background: var(--sidebar);
     transform: translateX(-100%);
     transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1);
     box-shadow: 0 0 70px rgba(0, 0, 0, 0.34);
@@ -1428,6 +1526,10 @@
 .reader-backdrop {
   position: fixed;
   inset: 0;
+  /* On desktop the reader opens over the *feed* only — start past the docked
+     sidebar so it stays visible (design 4b). On mobile --sidebar-w is 0, so the
+     reader takes the whole screen and rises over the feed (4a). */
+  left: var(--sidebar-w);
   z-index: 60;
   /* Matches the cinematic reader surface so the covered feed reads as one sheet
      — warm paper in light mode, near-black in dark. */
@@ -1439,11 +1541,27 @@
 .reader {
   position: fixed;
   inset: 0;
+  left: var(--sidebar-w);
   z-index: 61;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
   background: transparent;
+}
+/* Desktop: the panel reads as a sheet lifted over the feed — rounded inner
+   corner + a soft shadow cast back toward the sidebar. */
+@media (min-width: 921px) {
+  .reader,
+  .reader-backdrop {
+    border-top-left-radius: 20px;
+    border-bottom-left-radius: 20px;
+  }
+  .reader-backdrop {
+    box-shadow: -22px 0 64px rgba(20, 18, 28, 0.2);
+  }
+  .dark .reader-backdrop {
+    box-shadow: -22px 0 64px rgba(0, 0, 0, 0.6);
+  }
 }
 /* Ambient backlight: a blurred, enlarged copy of the hero whose colors bleed
    into the page background near the top (Apple Music "ambient background"). */
@@ -1485,7 +1603,8 @@
 .reader__progress {
   position: fixed;
   top: 0;
-  left: 0;
+  left: var(--sidebar-w);
+  right: 0;
   height: 3px;
   background: var(--news-accent);
   z-index: 63;

@@ -1,31 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   Newspaper,
   CircleDot,
   Bookmark,
-  ChevronRight,
   Plus,
+  FolderPlus,
   RefreshCw,
   Sun,
   Moon,
-  MoreHorizontal,
-  CheckCheck,
-  Trash2,
 } from "lucide-react";
 import type { Filter, FeedsTree, FeedNode } from "@/lib/types";
-import { Favicon } from "@/components/Img";
-import { feedColor } from "@/lib/format";
+import { FolderTree } from "@/components/FolderTree";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface SidebarProps {
   tree?: FeedsTree;
@@ -38,6 +28,8 @@ interface SidebarProps {
   onAddFeed: () => void;
   onMarkFeedRead: (feedId: number) => void;
   onRemoveFeed: (feed: FeedNode) => void;
+  onMoveFeed: (feedId: number, toCatId: number) => void;
+  onCreateFolder: (title: string) => void;
 }
 
 function ViewRow({
@@ -85,6 +77,51 @@ function ThemeToggle() {
   );
 }
 
+function NewFolder({ onCreate }: { onCreate: (title: string) => void }) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (adding) inputRef.current?.focus();
+  }, [adding]);
+
+  const commit = () => {
+    const t = name.trim();
+    if (t) onCreate(t);
+    setName("");
+    setAdding(false);
+  };
+
+  if (!adding) {
+    return (
+      <button type="button" className="ftree__newfolder" onClick={() => setAdding(true)}>
+        <FolderPlus className="size-4" />
+        New folder
+      </button>
+    );
+  }
+  return (
+    <div className="ftree__newfolder ftree__newfolder--editing">
+      <FolderPlus className="size-4" />
+      <input
+        ref={inputRef}
+        value={name}
+        placeholder="Folder name"
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") {
+            setName("");
+            setAdding(false);
+          }
+        }}
+        onBlur={commit}
+      />
+    </div>
+  );
+}
+
 export function Sidebar({
   tree,
   filter,
@@ -96,64 +133,14 @@ export function Sidebar({
   onAddFeed,
   onMarkFeedRead,
   onRemoveFeed,
+  onMoveFeed,
+  onCreateFolder,
 }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
-  const toggle = (id: number) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-
   const is = (kind: Filter["kind"], id?: number) => filter.kind === kind && filter.id === id;
   const pick = (f: Filter) => {
     onSelect(f);
     onClose();
   };
-
-  const cats = tree?.categories ?? [];
-  const single = cats.length === 1;
-
-  const FeedRow = (feed: FeedNode) => (
-    <div
-      key={feed.id}
-      className="feedrow"
-      data-active={is("feed", feed.id)}
-      style={{ "--feed": feedColor(feed.id) } as React.CSSProperties}
-    >
-      <button
-        type="button"
-        className="feedrow__main"
-        onClick={() => pick({ kind: "feed", id: feed.id, label: feed.title })}
-      >
-        <span className="feedrow__avatar">
-          <Favicon feedId={feed.id} className="feedrow__favicon" />
-        </span>
-        <span className="feedrow__name">{feed.title}</span>
-      </button>
-      {feed.unread > 0 && <span className="feedrow__dot" aria-label={`${feed.unread} unread`} />}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button type="button" className="feedrow__more" aria-label="Feed options">
-            <MoreHorizontal className="size-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="rounded-xl">
-          <DropdownMenuItem onClick={() => onMarkFeedRead(feed.id)}>
-            <CheckCheck className="size-4" />
-            Mark all as read
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onClick={() => onRemoveFeed(feed)}
-          >
-            <Trash2 className="size-4" />
-            Remove feed
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
 
   return (
     <>
@@ -204,37 +191,18 @@ export function Sidebar({
             </Tooltip>
           </div>
 
-          {cats.map((cat) => {
-            const isCollapsed = collapsed.has(cat.id);
-            return (
-              <div key={cat.id}>
-                {!single && (
-                  <div className="catrow" data-active={is("category", cat.id)}>
-                    <button
-                      type="button"
-                      className="catrow__chevron"
-                      onClick={() => toggle(cat.id)}
-                      aria-label={isCollapsed ? "Expand" : "Collapse"}
-                      style={{ transform: isCollapsed ? "none" : "rotate(90deg)" }}
-                    >
-                      <ChevronRight className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      className="catrow__name"
-                      onClick={() => pick({ kind: "category", id: cat.id, label: cat.title })}
-                    >
-                      {cat.title}
-                    </button>
-                    {cat.unread > 0 && <span className="catrow__count">{cat.unread}</span>}
-                  </div>
-                )}
-                {(single || !isCollapsed) && (
-                  <div className="feedlist">{cat.feeds.map((feed) => FeedRow(feed))}</div>
-                )}
-              </div>
-            );
-          })}
+          {tree && (
+            <FolderTree
+              categories={tree.categories}
+              filter={filter}
+              onSelectFeed={(feed) => pick({ kind: "feed", id: feed.id, label: feed.title })}
+              onMarkFeedRead={onMarkFeedRead}
+              onRemoveFeed={onRemoveFeed}
+              onMoveFeed={onMoveFeed}
+            />
+          )}
+
+          <NewFolder onCreate={onCreateFolder} />
         </nav>
 
         <div className="sidebar__footer">
