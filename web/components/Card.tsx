@@ -301,11 +301,14 @@ export function HeroCarousel({
     return () => clearTimeout(t);
   }, [paused, reduce, count, paginate, index]);
 
-  // Two-finger horizontal trackpad swipe. Native, non-passive so preventDefault
-  // sticks — otherwise Safari reads the gesture as a history back/forward swipe.
-  // Deltas are *accumulated* across the gesture so a slow drag still adds up to
-  // the threshold — a single event's deltaX can be tiny (2–8px) and would never
-  // trip a per-event check. The running total resets once the gesture settles.
+  // Horizontal navigation by gesture: two-finger trackpad swipe (wheel) and
+  // finger swipe (touch). Both must yield exactly ONE story per physical swipe.
+  // Deltas accumulate to a threshold, then the carousel locks until the gesture
+  // *settles* — an idle gap with no more events. A fixed-time lock used to let a
+  // hard fling's momentum tail trip a second advance ~half a second later;
+  // settling on idle ties one swipe to one story no matter how hard it's thrown.
+  // Wheel is non-passive so preventDefault sticks (else Safari reads it as a
+  // history back/forward swipe).
   useEffect(() => {
     const el = rootRef.current;
     if (!el || count <= 1) return;
@@ -313,24 +316,67 @@ export function HeroCarousel({
     let acc = 0;
     let lock = false;
     let idle = 0;
+
+    // Keep the gesture "alive" on every event; unlock + reset only once it stops.
+    const keepAlive = () => {
+      window.clearTimeout(idle);
+      idle = window.setTimeout(() => {
+        acc = 0;
+        lock = false;
+      }, 140);
+    };
+
     const onWheel = (e: WheelEvent) => {
       if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return; // vertical scroll — ignore
       e.preventDefault();
-      window.clearTimeout(idle);
-      idle = window.setTimeout(() => (acc = 0), 130); // gesture paused — start fresh next time
+      keepAlive();
       if (lock) return;
       if ((acc > 0) !== (e.deltaX > 0)) acc = 0; // reversed direction — restart the tally
       acc += e.deltaX;
       if (Math.abs(acc) < THRESHOLD) return;
-      const step = acc > 0 ? 1 : -1;
+      paginate(acc > 0 ? 1 : -1);
       acc = 0;
-      lock = true;
-      paginate(step);
-      window.setTimeout(() => (lock = false), 500);
+      lock = true; // held until the momentum settles, so it can't advance twice
     };
+
+    // Touch swipe (phones): a finger drag never fires `wheel`, so it needs its
+    // own path. Track horizontal travel; flip one story on release.
+    let sx = 0;
+    let sy = 0;
+    let touching = false;
+    let horiz = false;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      touching = true;
+      horiz = false;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!touching) return;
+      const dx = e.touches[0].clientX - sx;
+      const dy = e.touches[0].clientY - sy;
+      if (!horiz && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) horiz = true;
+      if (horiz) e.preventDefault(); // own it — stop the page scrolling under the swipe
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!touching) return;
+      touching = false;
+      const t = e.changedTouches[0];
+      const dx = (t?.clientX ?? sx) - sx;
+      const dy = (t?.clientY ?? sy) - sy;
+      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) paginate(dx < 0 ? 1 : -1);
+    };
+
     el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
       el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
       window.clearTimeout(idle);
     };
   }, [count, paginate]);

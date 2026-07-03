@@ -1155,6 +1155,8 @@
   box-shadow: var(--shadow-card);
   background: var(--muted);
   isolation: isolate;
+  /* Let vertical scrolling pass through, but the JS owns horizontal swipes. */
+  touch-action: pan-y;
 }
 .frontpage__col > .hero-carousel {
   height: 100%;
@@ -1526,10 +1528,10 @@
 .reader-backdrop {
   position: fixed;
   inset: 0;
-  /* On desktop the reader opens over the *feed* only — start past the docked
-     sidebar so it stays visible (design 4b). On mobile --sidebar-w is 0, so the
-     reader takes the whole screen and rises over the feed (4a). */
-  left: var(--sidebar-w);
+  /* Fullscreen on every breakpoint (design 4a): the reader rises over the whole
+     app and covers the sidebar, so an open article is edge to edge with no menu.
+     z-index sits above the sidebar (50) so the docked column is fully hidden. */
+  left: 0;
   z-index: 60;
   /* Matches the cinematic reader surface so the covered feed reads as one sheet
      — warm paper in light mode, near-black in dark. */
@@ -1541,27 +1543,12 @@
 .reader {
   position: fixed;
   inset: 0;
-  left: var(--sidebar-w);
+  left: 0;
   z-index: 61;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
   background: transparent;
-}
-/* Desktop: the panel reads as a sheet lifted over the feed — rounded inner
-   corner + a soft shadow cast back toward the sidebar. */
-@media (min-width: 921px) {
-  .reader,
-  .reader-backdrop {
-    border-top-left-radius: 20px;
-    border-bottom-left-radius: 20px;
-  }
-  .reader-backdrop {
-    box-shadow: -22px 0 64px rgba(20, 18, 28, 0.2);
-  }
-  .dark .reader-backdrop {
-    box-shadow: -22px 0 64px rgba(0, 0, 0, 0.6);
-  }
 }
 /* Ambient backlight: a blurred, enlarged copy of the hero whose colors bleed
    into the page background near the top (Apple Music "ambient background"). */
@@ -1603,7 +1590,7 @@
 .reader__progress {
   position: fixed;
   top: 0;
-  left: var(--sidebar-w);
+  left: 0;
   right: 0;
   height: 3px;
   background: var(--news-accent);
@@ -2136,7 +2123,7 @@
 .reader__cine-txthead {
   position: relative;
   padding: 104px clamp(20px, 4vw, 64px) 8px;
-  max-width: 860px;
+  max-width: 940px;
   margin: 0 auto;
   background: radial-gradient(
     120% 80% at 82% 0%,
@@ -2163,8 +2150,9 @@
 }
 
 /* ----- Body ----- */
+/* Centered column, wider measure so lines run longer before wrapping. */
 .reader__cine-article {
-  max-width: 680px;
+  max-width: 920px;
   margin: 0 auto;
   padding: 16px 24px 96px;
 }

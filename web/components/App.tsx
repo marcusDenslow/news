@@ -188,6 +188,18 @@ export function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // Lock background scroll while an article is open. Owned here (not in Reader)
+  // so it releases the instant `selected` clears — i.e. when the close starts,
+  // while the opaque sheet still covers the screen — instead of on Reader's
+  // unmount after the slide. `overflow: hidden` on <body> demotes the sticky
+  // sidebar + top bar to their static offset, so holding it through the exit
+  // animation is exactly what made them slide away with the scroll on close.
+  useEffect(() => {
+    if (!selected) return;
+    document.body.classList.add("scroll-lock");
+    return () => document.body.classList.remove("scroll-lock");
+  }, [selected]);
+
   const markRangeRead = useCallback(
     (body: { feedId?: number; categoryId?: number }, predicate: (e: CardEntry) => boolean) => {
       mutate(

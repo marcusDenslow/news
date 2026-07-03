@@ -291,6 +291,28 @@ export function FolderTree({
     return r ? { top: r.top, height: r.bottom - r.top } : null;
   }, [drag, projection.dropCatId, layout]);
 
+  // Each row's projected geometry, looked up by key.
+  const posByKey = useMemo(() => {
+    const m = new Map<string, LayoutRow>();
+    for (const r of layout.rows) m.set(r.key, r);
+    return m;
+  }, [layout]);
+
+  // Render rows in a STABLE order (the committed `base` order, which holds steady
+  // through a whole drag) rather than the live projected order. A row only ever
+  // moves via its `top` — the CSS transition on `top` can glide that. Rendering
+  // in projected order instead made React reparent a node the instant its slot
+  // index changed, and moving a node in the DOM drops any in-flight transition —
+  // which is why dragging upward used to teleport the rows below while dragging
+  // downward glided them. Feeds a collapsed folder reveals on hover aren't in
+  // `base`, so append them.
+  const orderedKeys = useMemo(() => {
+    const keys = base.rows.map((r) => r.key);
+    const known = new Set(keys);
+    for (const r of layout.rows) if (!known.has(r.key)) keys.push(r.key);
+    return keys;
+  }, [base, layout]);
+
   /* ---- pointer drag ---- */
 
   const containerY = (clientY: number) => {
@@ -412,7 +434,9 @@ export function FolderTree({
         <div className="ftree__dropbox" style={{ top: dropBox.top, height: dropBox.height }} />
       )}
 
-      {layout.rows.map((row) => {
+      {orderedKeys.map((key) => {
+        const row = posByKey.get(key);
+        if (!row) return null;
         const isDragged = row.key === projection.floatKey && drag?.started;
         const y = isDragged && drag ? drag.pointerY - drag.grabOffset : row.y;
 

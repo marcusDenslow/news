@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AnimatePresence,
   motion,
   useScroll,
   useTransform,
   useReducedMotion,
-  usePresence,
-  animate,
   type Variants,
 } from "motion/react";
 import useSWR from "swr";
@@ -26,7 +25,9 @@ import { imgProxy, readingTimeLabel, jsonFetcher } from "@/lib/format";
 import { MediaImg } from "@/components/Img";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const EASE_IN = [0.4, 0, 0.28, 1] as const;
+// iOS sheet curve — the whole reader slides up from the bottom of the screen on
+// open and back down on close (the "phone" presentation, design 4a).
+const SHEET_EASE = [0.32, 0.72, 0, 1] as const;
 
 function shortDate(iso: string): string {
   const d = new Date(iso);
@@ -34,9 +35,50 @@ function shortDate(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function processHtml(html: string): string {
+// Best-effort "is this the same photo?" for the hero-vs-body dedup. Exact match
+// on origin+path, else same filename (CDN size/crop variants share a basename).
+function sameImage(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const norm = (u: string) => {
+    try {
+      const url = new URL(u, window.location.href);
+      const file = (url.pathname.split("/").filter(Boolean).pop() ?? "").toLowerCase();
+      return { full: (url.origin + url.pathname).toLowerCase(), file };
+    } catch {
+      const s = u.toLowerCase();
+      return { full: s, file: s };
+    }
+  };
+  const A = norm(a);
+  const B = norm(b);
+  if (A.full === B.full) return true;
+  return A.file.length > 4 && A.file === B.file && /\.(jpe?g|png|webp|gif|avif)/.test(A.file);
+}
+
+// `heroSrc` is the entry's lead image, already shown as the reader hero. Many
+// feeds also embed it as the first thing in the body, so it reads twice — drop
+// that leading copy (and its now-empty wrapper). Runs before the proxy rewrite
+// so the comparison sees the original src.
+function processHtml(html: string, heroSrc?: string | null): string {
   if (typeof window === "undefined" || !html) return html ?? "";
   const doc = new DOMParser().parseFromString(html, "text/html");
+
+  if (heroSrc) {
+    const first = doc.querySelector("img");
+    if (first && sameImage(first.getAttribute("src"), heroSrc)) {
+      const parent = first.parentElement;
+      first.remove();
+      if (
+        parent &&
+        ["FIGURE", "P", "DIV"].includes(parent.tagName) &&
+        !parent.querySelector("img, video, iframe, picture") &&
+        !(parent.textContent ?? "").trim()
+      ) {
+        parent.remove();
+      }
+    }
+  }
+
   doc.querySelectorAll("img").forEach((img) => {
     const src = img.getAttribute("src");
     img.removeAttribute("srcset");
@@ -74,7 +116,7 @@ interface ReaderProps {
   onToggleStar: (entry: CardEntry) => void;
 }
 
-export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
+export function Reader({ entry, onClose, onToggleStar }: ReaderProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ container: scrollRef });
   const reduce = useReducedMotion();
@@ -92,83 +134,12 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
   const heroY = useTransform(heroP, [0, 1], [0, 140]);
   const heroScale = useTransform(heroP, [0, 1], [1.06, 1.16]);
 
-  // ---- Single-element hero morph -------------------------------------------
-  // One box flies from the card's on-screen rect into the full-bleed hero and
-  // back. No shared-layout crossfade — there is only ever this one element in
-  // flight, so the eye tracks it cleanly. The page is scroll-locked while open,
-  // so the captured `origin` rect stays valid for the collapse on close.
-  const heroRef = useRef<HTMLDivElement>(null);
-  const flipRef = useRef<{ dx: number; dy: number; sx: number; sy: number } | null>(null);
-  const [isPresent, safeToRemove] = usePresence();
-
-  useLayoutEffect(() => {
-    const el = heroRef.current;
-    if (!el) return; // no hero (text-only entry)
-    if (!origin) {
-      // Opened from a brief thumbnail (aspect mismatch): just ease the hero up.
-      if (!reduce) animate(el, { opacity: [0, 1], y: [10, 0] }, { duration: 0.5, ease: EASE });
-      return;
-    }
-    const d = el.getBoundingClientRect();
-    if (!d.width || !d.height) return;
-    const flip = {
-      dx: origin.left - d.left,
-      dy: origin.top - d.top,
-      sx: origin.width / d.width,
-      sy: origin.height / d.height,
-    };
-    flipRef.current = flip;
-    el.style.transformOrigin = "top left";
-    if (reduce) return;
-    animate(
-      el,
-      {
-        x: [flip.dx, 0],
-        y: [flip.dy, 0],
-        scaleX: [flip.sx, 1],
-        scaleY: [flip.sy, 1],
-        // Radius is scaled by the transform, so counter-scale it: 16/sx renders
-        // as ~16px (the card radius) at the shrunk end, 0 at the full-bleed end.
-        borderRadius: [`${16 / flip.sx}px`, "0px"],
-      },
-      { duration: 0.56, ease: EASE }
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [origin]);
-
-  // Collapse back into the card when the reader is being removed.
-  useLayoutEffect(() => {
-    if (isPresent) return;
-    const el = heroRef.current;
-    const flip = flipRef.current;
-    if (!el || !flip || reduce) {
-      if (el && !reduce) animate(el, { opacity: [1, 0] }, { duration: 0.26 });
-      const t = setTimeout(() => safeToRemove?.(), reduce ? 0 : 300);
-      return () => clearTimeout(t);
-    }
-    el.style.transformOrigin = "top left";
-    animate(
-      el,
-      {
-        x: [0, flip.dx],
-        y: [0, flip.dy],
-        scaleX: [1, flip.sx],
-        scaleY: [1, flip.sy],
-        borderRadius: ["0px", `${16 / flip.sx}px`],
-      },
-      { duration: 0.44, ease: EASE_IN }
-    ).then(() => safeToRemove?.());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPresent]);
-
-  // Headline + body settle in after the hero has begun its flight, then leave in
-  // a quick downward cascade. Reduced motion collapses it all to a plain cut.
+  // Headline + body settle in just after the sheet has slid up, then leave in a
+  // quick downward cascade. Reduced motion collapses it all to a plain cut.
   const containerV: Variants = {
     hidden: {},
     show: {
-      transition: reduce
-        ? {}
-        : { staggerChildren: 0.055, delayChildren: origin ? 0.16 : 0.05 },
+      transition: reduce ? {} : { staggerChildren: 0.055, delayChildren: 0.16 },
     },
     exit: { transition: reduce ? {} : { staggerChildren: 0.028, staggerDirection: -1 } },
   };
@@ -191,11 +162,10 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
   const [loadingFull, setLoadingFull] = useState(false);
   const [speaking, setSpeaking] = useState(false);
 
-  // Lock the page behind the reader.
-  useEffect(() => {
-    document.body.classList.add("scroll-lock");
-    return () => document.body.classList.remove("scroll-lock");
-  }, []);
+  // (Page scroll-lock is owned by App, keyed on the selected entry, so it lifts
+  // the instant close begins — not on unmount after the slide. Held here it kept
+  // `overflow: hidden` on <body> through the whole exit, which drops the sticky
+  // sidebar + top bar to their static offset for the length of the animation.)
 
   // Escape closes.
   useEffect(() => {
@@ -211,7 +181,10 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
 
   const baseHtml = data?.content ?? "";
   const displayedHtml = showingFull && fullHtml != null ? fullHtml : baseHtml;
-  const processed = useMemo(() => processHtml(displayedHtml), [displayedHtml]);
+  const processed = useMemo(
+    () => processHtml(displayedHtml, entry.image),
+    [displayedHtml, entry.image]
+  );
 
   async function loadFull() {
     if (fullHtml != null) {
@@ -287,16 +260,27 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
 
   return (
     <>
+      {/* Fades in as the sheet rises (masks the feed behind). On close it drops
+          instantly instead of lingering — the opaque sheet still covers the
+          screen at that instant, so the reader sliding down reveals the live
+          sidebar + top bar rather than this cover snapping away afterwards. */}
       <motion.div
         className="reader-backdrop"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        exit={{ opacity: 0, transition: { duration: 0 } }}
         transition={{ duration: 0.4, ease: EASE }}
         onClick={onClose}
       />
 
-      <motion.div className="reader reader--cine" ref={scrollRef}>
+      <motion.div
+        className="reader reader--cine"
+        ref={scrollRef}
+        initial={reduce ? { opacity: 0 } : { y: "100%" }}
+        animate={reduce ? { opacity: 1 } : { y: 0 }}
+        exit={reduce ? { opacity: 0 } : { y: "100%" }}
+        transition={{ duration: reduce ? 0.2 : 0.5, ease: SHEET_EASE }}
+      >
         <motion.div className="reader__progress" style={{ scaleX: scrollYProgress }} />
 
         {/* Floating glass controls, over the hero. Back on the left; a vertical
@@ -359,10 +343,9 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
 
         {entry.image ? (
           <div className="reader__cine-herowrap" ref={herowrapRef}>
-            {/* Morphs from the card rect (see the layout effects). Plain div — it
-                must not be under Motion's layout system or the flight fights the
-                projection. */}
-            <div className="reader__cine-hero" ref={heroRef}>
+            {/* The whole sheet slides up, so the hero just rides in with it — no
+                per-image flight. The inner image still parallax-scrolls. */}
+            <div className="reader__cine-hero">
               <motion.div className="reader__cine-heroimg" style={heroImgStyle}>
                 <MediaImg src={entry.image} eager />
               </motion.div>
@@ -427,7 +410,20 @@ export function Reader({ entry, origin, onClose, onToggleStar }: ReaderProps) {
                 ))}
               </div>
             ) : (
-              <div className="article-body" dangerouslySetInnerHTML={{ __html: processed }} />
+              // Summary ↔ full-text swap: the outgoing copy lifts + fades, the
+              // incoming settles up from below. `mode="wait"` keeps the two from
+              // overlapping while their heights differ (design 6a).
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={showingFull ? "full" : "summary"}
+                  initial={reduce ? false : { opacity: 0, y: 12 }}
+                  animate={reduce ? {} : { opacity: 1, y: 0 }}
+                  exit={reduce ? {} : { opacity: 0, y: -8 }}
+                  transition={{ duration: reduce ? 0 : 0.26, ease: EASE }}
+                >
+                  <div className="article-body" dangerouslySetInnerHTML={{ __html: processed }} />
+                </motion.div>
+              </AnimatePresence>
             )}
           </motion.div>
         </motion.article>
