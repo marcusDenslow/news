@@ -354,6 +354,13 @@ export async function deleteFeed(feedId: number): Promise<void> {
   await mf<void>(`/feeds/${feedId}`, { method: "DELETE" });
 }
 
+// Remove a category (folder). Miniflux refuses to delete a category that still
+// holds feeds, and refuses to delete the last category — callers empty the
+// folder (move or delete its feeds) first.
+export async function deleteCategory(categoryId: number): Promise<void> {
+  await mf<void>(`/categories/${categoryId}`, { method: "DELETE" });
+}
+
 // Move a feed into another category (folder). Miniflux has no per-feed sort
 // order, so drag-reorder within a folder is a client concern (persisted in the
 // browser); only the folder membership lives server-side.

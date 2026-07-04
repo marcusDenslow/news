@@ -330,6 +330,83 @@ export function App() {
     [mutateTree]
   );
 
+  const markFolderRead = useCallback(
+    async (catId: number) => {
+      const cat = tree?.categories.find((c) => c.id === catId);
+      const feedIds = new Set(cat?.feeds.map((f) => f.id) ?? []);
+      try {
+        await markRangeRead({ categoryId: catId }, (e) => feedIds.has(e.feedId));
+        toast.success("Marked all as read");
+      } catch {
+        toast.error("Couldn’t mark all read");
+      }
+      mutateTree();
+    },
+    [tree, markRangeRead, mutateTree]
+  );
+
+  // Delete a folder. `withFeeds` removes the feeds too; otherwise the feeds are
+  // moved into another folder so nothing is orphaned (Miniflux won't delete a
+  // non-empty category). Any browser-local nesting under it self-heals on the
+  // next tree build (children pop back to the root).
+  const deleteFolder = useCallback(
+    (catId: number, withFeeds: boolean) => {
+      const cat = tree?.categories.find((c) => c.id === catId);
+      if (!cat) return;
+      const feeds = cat.feeds;
+      const others = tree?.categories.filter((c) => c.id !== catId) ?? [];
+      if (!withFeeds && feeds.length > 0 && others.length === 0) {
+        toast.error("Create another folder first — its feeds need a home");
+        return;
+      }
+      const target = others[0];
+      toast(withFeeds ? `Delete “${cat.title}” and its feeds?` : `Delete folder “${cat.title}”?`, {
+        description: withFeeds
+          ? `${feeds.length} feed${feeds.length === 1 ? "" : "s"} and their stories will be removed.`
+          : feeds.length > 0
+            ? `Its ${feeds.length} feed${feeds.length === 1 ? "" : "s"} move to “${target.title}”.`
+            : "The empty folder will be removed.",
+        action: {
+          label: "Delete",
+          onClick: async () => {
+            try {
+              if (withFeeds) {
+                await Promise.all(
+                  feeds.map((f) => fetch(`/api/feeds/${f.id}`, { method: "DELETE" }))
+                );
+              } else if (feeds.length > 0) {
+                await Promise.all(
+                  feeds.map((f) =>
+                    fetch(`/api/feeds/${f.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ categoryId: target.id }),
+                    })
+                  )
+                );
+              }
+              const res = await fetch(`/api/categories/${catId}`, { method: "DELETE" });
+              if (!res.ok) throw new Error();
+              toast.success(withFeeds ? "Folder and feeds deleted" : "Folder deleted");
+              // If the current view lived inside this folder, fall back to Today.
+              const viewingDeletedFeed =
+                filter.kind === "feed" && withFeeds && feeds.some((f) => f.id === filter.id);
+              if ((filter.kind === "category" && filter.id === catId) || viewingDeletedFeed) {
+                setFilter({ kind: "today", label: "Today" });
+              }
+              mutateTree();
+              mutate();
+            } catch {
+              toast.error("Couldn’t delete folder");
+              mutateTree();
+            }
+          },
+        },
+      });
+    },
+    [tree, filter, mutateTree, mutate]
+  );
+
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -361,6 +438,8 @@ export function App() {
         onRemoveFeed={removeFeed}
         onMoveFeed={moveFeedToCategory}
         onCreateFolder={createFolder}
+        onMarkFolderRead={markFolderRead}
+        onDeleteFolder={deleteFolder}
       />
 
       <main className="main" data-reader-open={!!selected}>

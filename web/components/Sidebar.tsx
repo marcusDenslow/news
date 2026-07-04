@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import {
-  Newspaper,
   CircleDot,
   Bookmark,
   Plus,
@@ -30,6 +29,22 @@ interface SidebarProps {
   onRemoveFeed: (feed: FeedNode) => void;
   onMoveFeed: (feedId: number, toCatId: number) => void;
   onCreateFolder: (title: string) => void;
+  onMarkFolderRead: (catId: number) => void;
+  onDeleteFolder: (catId: number, withFeeds: boolean) => void;
+}
+
+// Today's list-lines mark, straight from the "News Reader" design (3a).
+function TodayIcon() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 15 15" fill="none" aria-hidden>
+      <path
+        d="M2 3.5h11M2 7.5h11M2 11.5h7"
+        stroke="currentColor"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
 function ViewRow({
@@ -135,6 +150,8 @@ export function Sidebar({
   onRemoveFeed,
   onMoveFeed,
   onCreateFolder,
+  onMarkFolderRead,
+  onDeleteFolder,
 }: SidebarProps) {
   const is = (kind: Filter["kind"], id?: number) => filter.kind === kind && filter.id === id;
   const pick = (f: Filter) => {
@@ -153,7 +170,7 @@ export function Sidebar({
         <nav className="sidebar__scroll">
           <div className="railviews">
             <ViewRow
-              icon={<Newspaper className="size-[18px]" />}
+              icon={<TodayIcon />}
               label="Today"
               active={is("today")}
               onClick={() => pick({ kind: "today", label: "Today" })}
@@ -199,11 +216,16 @@ export function Sidebar({
               onMarkFeedRead={onMarkFeedRead}
               onRemoveFeed={onRemoveFeed}
               onMoveFeed={onMoveFeed}
+              onMarkFolderRead={onMarkFolderRead}
+              onDeleteFolder={onDeleteFolder}
             />
           )}
-
-          <NewFolder onCreate={onCreateFolder} />
         </nav>
+
+        {/* Pinned below the scroll — New folder always sits at the bottom of the list. */}
+        <div className="sidebar__newfolder-dock">
+          <NewFolder onCreate={onCreateFolder} />
+        </div>
 
         <div className="sidebar__footer">
           <Tooltip>

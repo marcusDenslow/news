@@ -654,6 +654,7 @@
   position: relative;
   margin-top: 2px;
   /* height is set inline from the computed layout */
+  transition: height 0.32s cubic-bezier(0.3, 1.25, 0.55, 1);
 }
 .ftree__row {
   position: absolute;
@@ -667,8 +668,10 @@
   user-select: none;
   touch-action: none;
   z-index: 2;
-  transition: top 0.28s cubic-bezier(0.3, 1.25, 0.55, 1),
-    background 0.14s ease, box-shadow 0.2s ease, transform 0.14s ease;
+  transition: top 0.3s cubic-bezier(0.3, 1.2, 0.55, 1),
+    padding-left 0.24s cubic-bezier(0.3, 1.2, 0.55, 1),
+    opacity 0.22s ease, background 0.14s ease, box-shadow 0.2s ease,
+    transform 0.14s ease;
 }
 /* The lifted row tracks the pointer directly — no top glide, elevated + shadowed. */
 .ftree__row[data-dragged] {
@@ -720,12 +723,13 @@
   color: var(--news-accent);
   font-variant-numeric: tabular-nums;
   padding-left: 6px;
+  /* Crossfades with the ··· menu button when the row is hovered. */
+  transition: opacity 0.14s ease;
 }
 
-/* Feed row */
+/* Feed row (left padding is depth-driven inline). */
 .ftree__feed {
   cursor: grab;
-  padding-left: 26px;
 }
 .ftree__feed:active {
   cursor: grabbing;
@@ -781,6 +785,7 @@
 }
 .ftree__unread--feed {
   color: color-mix(in oklch, var(--muted-foreground) 88%, transparent);
+  transition: opacity 0.14s ease;
 }
 .ftree__more {
   position: absolute;
@@ -795,10 +800,13 @@
   opacity: 0;
   transition: opacity 0.12s ease, background 0.12s ease;
 }
-.ftree__feed:hover .ftree__more {
+.ftree__feed:hover .ftree__more,
+.ftree__header:hover .ftree__more,
+.ftree__more[data-state="open"] {
   opacity: 1;
 }
-.ftree__feed:hover .ftree__unread--feed {
+.ftree__feed:hover .ftree__unread--feed,
+.ftree__header:hover .ftree__unread {
   opacity: 0;
 }
 .ftree__more:hover {
@@ -814,19 +822,42 @@
   z-index: 0;
   border-radius: 14px;
   background: color-mix(in oklch, var(--news-accent) 8%, transparent);
-  box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--news-accent) 38%, transparent);
+  border: 1.5px dashed color-mix(in oklch, var(--news-accent) 55%, transparent);
   transition: top 0.22s cubic-bezier(0.3, 1.2, 0.55, 1),
     height 0.22s cubic-bezier(0.3, 1.2, 0.55, 1);
   pointer-events: none;
 }
+/* On drop, the highlight plays a spring bounce in place, then fades. */
+.ftree__dropbox--confirm {
+  transition: none;
+  animation: ftree-drop-confirm 0.47s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes ftree-drop-confirm {
+  0% {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+  40% {
+    transform: scale(1.015);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
 
 /* New folder */
+/* Docked below the scroll so it always sits at the bottom of the channel list. */
+.sidebar__newfolder-dock {
+  flex-shrink: 0;
+  padding: 8px 16px 10px;
+}
 .ftree__newfolder {
   display: flex;
   align-items: center;
   gap: 9px;
   width: 100%;
-  margin-top: 12px;
   padding: 9px 12px;
   border-radius: 11px;
   border: 1px dashed var(--hairline);
