@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Sun,
   Moon,
+  LogOut,
 } from "lucide-react";
 import type { Filter, FeedsTree, FeedNode } from "@/lib/types";
 import { FolderTree } from "@/components/FolderTree";
@@ -31,6 +32,8 @@ interface SidebarProps {
   onCreateFolder: (title: string) => void;
   onMarkFolderRead: (catId: number) => void;
   onDeleteFolder: (catId: number, withFeeds: boolean) => void;
+  username?: string;
+  onLogout: () => void;
 }
 
 // Today's list-lines mark, straight from the "News Reader" design (3a).
@@ -152,6 +155,8 @@ export function Sidebar({
   onCreateFolder,
   onMarkFolderRead,
   onDeleteFolder,
+  username,
+  onLogout,
 }: SidebarProps) {
   const is = (kind: Filter["kind"], id?: number) => filter.kind === kind && filter.id === id;
   const pick = (f: Filter) => {
@@ -226,6 +231,28 @@ export function Sidebar({
         <div className="sidebar__newfolder-dock">
           <NewFolder onCreate={onCreateFolder} />
         </div>
+
+        {username && (
+          <div className="sidebar__account">
+            <span className="sidebar__account-avatar" aria-hidden>
+              {username.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="sidebar__account-name">{username}</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="sidebar__logout"
+                  onClick={onLogout}
+                  aria-label="Sign out"
+                >
+                  <LogOut className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Sign out</TooltipContent>
+            </Tooltip>
+          </div>
+        )}
 
         <div className="sidebar__footer">
           <Tooltip>

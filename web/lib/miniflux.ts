@@ -11,15 +11,23 @@ import type {
   FeedsTree,
   CategoryNode,
 } from "./types";
+import { authStore } from "./authContext";
 
 const BASE = (process.env.MINIFLUX_URL ?? "http://localhost:8080").replace(/\/$/, "");
 const TOKEN = process.env.MINIFLUX_TOKEN ?? "";
 
-async function mf<T>(path: string, init?: RequestInit): Promise<T> {
+// The env token belongs to the admin user; used for user administration and by
+// system tasks that run outside any request (the backfill timer).
+const ADMIN_AUTH: Record<string, string> = { "X-Auth-Token": TOKEN };
+
+async function mf<T>(path: string, init?: RequestInit, authOverride?: Record<string, string>): Promise<T> {
+  // Prefer an explicit override, then the request-scoped user (set by
+  // withSession), then the admin token.
+  const auth = authOverride ?? authStore.getStore()?.authHeaders ?? ADMIN_AUTH;
   const res = await fetch(`${BASE}/v1${path}`, {
     ...init,
     headers: {
-      "X-Auth-Token": TOKEN, // NB: hyphen, not underscore
+      ...auth,
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
     },
@@ -381,4 +389,53 @@ export async function getIcon(feedId: number): Promise<{ mime: string; bytes: Bu
   } catch {
     return null;
   }
+}
+
+/* ------------------------------ accounts ------------------------------- *
+ * Multi-user login rides on Miniflux's own users. Listing/creating users is
+ * an admin operation (the env token must belong to an admin); verifying a
+ * login uses that user's own Basic credentials. Read/unread/saved/folders are
+ * all per-user in Miniflux, so signing in as a user cleanly separates their
+ * news. Feed subscriptions are per-user too (opt-in); the host-wide premium
+ * cookie store is unchanged, so paywalled full-text stays shared.
+ * ---------------------------------------------------------------------- */
+
+function basicHeader(username: string, password: string): string {
+  return "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+}
+
+// The profile rail on the login page. Admin-scoped, so it always uses the env
+// token regardless of any ambient session.
+export async function listUsers(): Promise<{ id: number; username: string }[]> {
+  const users = await mf<Array<{ id: number; username: string }>>("/users", undefined, ADMIN_AUTH);
+  return users.map((u) => ({ id: u.id, username: u.username }));
+}
+
+// Create a new profile (Miniflux user). Admin-scoped.
+export async function createUser(
+  username: string,
+  password: string
+): Promise<{ id: number; username: string }> {
+  const u = await mf<{ id: number; username: string }>(
+    "/users",
+    { method: "POST", body: JSON.stringify({ username, password }) },
+    ADMIN_AUTH
+  );
+  return { id: u.id, username: u.username };
+}
+
+// Verify a login directly against Miniflux (Basic auth), bypassing any ambient
+// token. Returns the header value to persist in the session, or null if wrong.
+export async function verifyCredentials(
+  username: string,
+  password: string
+): Promise<{ username: string; authHeader: string } | null> {
+  const authHeader = basicHeader(username, password);
+  const res = await fetch(`${BASE}/v1/me`, {
+    headers: { Authorization: authHeader },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const me = (await res.json()) as { username: string };
+  return { username: me.username, authHeader };
 }

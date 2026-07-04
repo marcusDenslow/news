@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import { AnimatePresence } from "motion/react";
@@ -16,7 +17,8 @@ import { AddFeedDialog } from "@/components/AddFeedDialog";
 const PAGE = 24;
 type Page = { total: number; entries: CardEntry[] };
 
-export function App() {
+export function App({ username }: { username?: string }) {
+  const router = useRouter();
   const [filter, setFilter] = useState<Filter>({ kind: "today", label: "Today" });
   const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -407,6 +409,16 @@ export function App() {
     [tree, filter, mutateTree, mutate]
   );
 
+  const logout = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* clearing the cookie server-side failed — still bounce to login */
+    }
+    router.replace("/login");
+    router.refresh();
+  }, [router]);
+
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -440,6 +452,8 @@ export function App() {
         onCreateFolder={createFolder}
         onMarkFolderRead={markFolderRead}
         onDeleteFolder={deleteFolder}
+        username={username}
+        onLogout={logout}
       />
 
       <main className="main" data-reader-open={!!selected}>

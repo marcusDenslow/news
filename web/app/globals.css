@@ -580,6 +580,50 @@
   gap: 6px;
 }
 
+/* Signed-in profile chip, pinned above the refresh/theme footer. */
+.sidebar__account {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 16px 4px;
+}
+.sidebar__account-avatar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--news-accent);
+}
+.sidebar__account-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar__logout {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  flex: none;
+  color: var(--muted-foreground);
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.sidebar__logout:hover {
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+}
+
 /* ---- Primary views (Today / Unread / Saved) ---- */
 .railviews {
   display: flex;
@@ -2368,4 +2412,238 @@
 .reader__cine-railbtn:hover::after {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
+}
+
+/* ============================ Login ============================
+   "Who's reading" profile picker — always dark, from the News Login design. */
+@keyframes loginFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes loginCardIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes loginShake {
+  10%, 90% { transform: translateX(-2px); }
+  30%, 70% { transform: translateX(4px); }
+  50% { transform: translateX(-5px); }
+}
+.login {
+  position: fixed;
+  inset: 0;
+  background: #0b0b0d;
+  color: #f4f1ea;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.login__wordmark {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-instrument), "Instrument Serif", serif;
+  font-size: 22px;
+  color: rgba(244, 241, 234, 0.85);
+}
+.login__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: loginFade 0.5s ease both;
+  padding: 0 24px;
+  max-width: 100%;
+}
+.login__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  color: rgba(240, 237, 230, 0.35);
+  text-transform: uppercase;
+  margin-bottom: 40px;
+}
+.login__rail {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 44px;
+  margin-bottom: 60px;
+  max-width: 720px;
+}
+.login__name {
+  cursor: pointer;
+  font-family: var(--font-instrument), "Instrument Serif", serif;
+  font-size: 36px;
+  line-height: 1;
+  color: rgba(240, 237, 230, 0.32);
+  padding-bottom: 12px;
+  background: none;
+  border: 0;
+  transition: color 0.3s, transform 0.3s cubic-bezier(0.32, 0.72, 0, 1),
+    letter-spacing 0.3s;
+}
+.login__name:hover {
+  transform: translateY(-5px);
+  color: #f4f1ea;
+  letter-spacing: 0.015em;
+}
+.login__name[data-active="true"] {
+  color: #f4f1ea;
+}
+.login__add {
+  position: relative;
+  align-self: center;
+  padding-bottom: 12px;
+}
+.login__addbtn {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: 0;
+  color: rgba(240, 237, 230, 0.4);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: color 0.25s;
+}
+.login__addbtn[data-open="true"],
+.login__addbtn:hover {
+  color: #d9b98a;
+}
+.login__addbtn svg {
+  transition: transform 0.3s;
+}
+.login__addbtn[data-open="true"] svg {
+  transform: rotate(135deg);
+}
+.login__card {
+  position: absolute;
+  bottom: 100%;
+  right: -8px;
+  margin-bottom: 18px;
+  width: 248px;
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  padding: 18px;
+  animation: loginCardIn 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+  z-index: 5;
+  text-align: left;
+}
+.login__card-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: rgba(240, 237, 230, 0.4);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.login__card input {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(240, 237, 230, 0.16);
+  outline: none;
+  font: inherit;
+  font-size: 15px;
+  color: #f4f1ea;
+  padding: 0 0 9px;
+  margin-bottom: 16px;
+}
+.login__card input:last-of-type {
+  margin-bottom: 20px;
+}
+.login__card input:focus {
+  border-color: #d9b98a;
+}
+.login__card input::placeholder {
+  color: rgba(240, 237, 230, 0.4);
+}
+.login__create {
+  height: 40px;
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  background: #d9b98a;
+  color: #1a1712;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+.login__create:hover { background: #e6c9a3; }
+.login__create:active { transform: scale(0.97); }
+.login__bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 1.5px;
+  background: #d9b98a;
+  transition: left 0.42s cubic-bezier(0.32, 0.72, 0, 1),
+    width 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.login__pass {
+  width: 300px;
+  max-width: 100%;
+  border-bottom: 1px solid rgba(240, 237, 230, 0.18);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 11px;
+  transition: border-color 0.25s;
+}
+.login__pass:focus-within {
+  border-color: #d9b98a;
+}
+.login__pass[data-error="true"] {
+  border-color: #e06a5a;
+  animation: loginShake 0.4s;
+}
+.login__pass input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font: inherit;
+  font-size: 16px;
+  color: #f4f1ea;
+}
+.login__pass input::placeholder {
+  color: rgba(240, 237, 230, 0.4);
+}
+.login__go {
+  cursor: pointer;
+  color: rgba(240, 237, 230, 0.4);
+  display: flex;
+  background: none;
+  border: 0;
+  padding: 0;
+  transition: color 0.2s, opacity 0.2s;
+}
+.login__go:hover { color: #d9b98a; }
+.login__go:disabled { opacity: 0.4; cursor: default; }
+.login__error {
+  margin-top: 18px;
+  min-height: 16px;
+  font-size: 13px;
+  color: #e06a5a;
+}
+.login__hint {
+  margin-top: 26px;
+  font-size: 12.5px;
+  color: rgba(240, 237, 230, 0.3);
 }
