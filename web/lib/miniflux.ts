@@ -154,7 +154,7 @@ function domainOf(entry: RawEntry): string {
   }
 }
 
-function toCard(entry: RawEntry): CardEntry {
+export function toCard(entry: RawEntry): CardEntry {
   return {
     id: entry.id,
     title: entry.title,
@@ -189,7 +189,7 @@ export interface ListParams {
   offset?: number;
 }
 
-export async function listEntries(p: ListParams): Promise<{ total: number; entries: CardEntry[] }> {
+function entriesPath(p: ListParams): string {
   const qs = new URLSearchParams({
     order: "published_at",
     direction: "desc",
@@ -208,9 +208,19 @@ export async function listEntries(p: ListParams): Promise<{ total: number; entri
   let base = "/entries";
   if (p.feedId) base = `/feeds/${p.feedId}/entries`;
   else if (p.categoryId) base = `/categories/${p.categoryId}/entries`;
+  return `${base}?${qs.toString()}`;
+}
 
-  const data = await mf<{ total: number; entries: RawEntry[] }>(`${base}?${qs.toString()}`);
-  return { total: data.total, entries: (data.entries ?? []).map(toCard) };
+// Raw entries (full content) — used by the local fuzzy search index, which needs
+// the whole article body, not the truncated card excerpt.
+export async function listRawEntries(p: ListParams): Promise<{ total: number; entries: RawEntry[] }> {
+  const data = await mf<{ total: number; entries: RawEntry[] }>(entriesPath(p));
+  return { total: data.total, entries: data.entries ?? [] };
+}
+
+export async function listEntries(p: ListParams): Promise<{ total: number; entries: CardEntry[] }> {
+  const { total, entries } = await listRawEntries(p);
+  return { total, entries: entries.map(toCard) };
 }
 
 export async function getEntry(id: number): Promise<FullEntry> {
