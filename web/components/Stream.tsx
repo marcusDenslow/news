@@ -353,19 +353,28 @@ export function Stream({
   const streamRef = useRef<HTMLDivElement>(null);
   const { cols, width: colWidth, inner } = useGrid(streamRef);
 
-  // Search entrance: the feed cross-fades back, then the query masthead lifts in
-  // and the result cards cascade up. `reveal` gates it, and is retriggered off a
-  // brief false→true flip on each new query so re-searching replays the settle.
+  // Search entrance, two modes so refining a query doesn't replay the whole show:
+  //   enter  – first keystroke into search: masthead lifts in + cards cascade.
+  //   update – subsequent keystrokes: a quick, near-uniform list settle only.
+  // Both are retriggered by a brief reveal false→true flip; `mode` picks which
+  // animation the CSS runs and whether the masthead re-animates.
   const query = search.trim();
   const searching = query.length > 0;
+  const wasSearching = useRef(false);
   const [reveal, setReveal] = useState(false);
+  const [mode, setMode] = useState<"enter" | "update">("enter");
   useEffect(() => {
     if (!searching) {
       setReveal(false);
+      wasSearching.current = false;
       return;
     }
+    const fresh = !wasSearching.current;
+    wasSearching.current = true;
+    setMode(fresh ? "enter" : "update");
     setReveal(false);
-    const t = setTimeout(() => setReveal(true), REVEAL_DELAY);
+    // Snappier retrigger while refining; the full entrance gets the design beat.
+    const t = setTimeout(() => setReveal(true), fresh ? REVEAL_DELAY : 20);
     return () => clearTimeout(t);
   }, [query, searching]);
 
@@ -431,6 +440,7 @@ export function Stream({
       ref={streamRef}
       data-searching={searching ? "" : undefined}
       data-reveal={reveal ? "" : undefined}
+      data-mode={searching ? mode : undefined}
     >
       <header className="masthead">
         <div className="masthead__eyebrow" suppressHydrationWarning>
