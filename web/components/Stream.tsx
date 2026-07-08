@@ -225,6 +225,70 @@ function Brief({
   );
 }
 
+// One search result — a compact row (thumb + source + title + meta), matching
+// design item 7. `enterIndex` drives its slot in the staggered cascade.
+function SearchRow({
+  entry,
+  onOpen,
+  enterIndex,
+}: {
+  entry: CardEntry;
+  onOpen: (e: CardEntry, originRect?: DOMRect) => void;
+  enterIndex: number;
+}) {
+  const open = (e: React.MouseEvent | React.KeyboardEvent) => {
+    const thumb = (e.currentTarget as HTMLElement).querySelector(".search-row__thumb");
+    onOpen(entry, thumb?.getBoundingClientRect());
+  };
+  return (
+    <div
+      className="search-row"
+      data-search-enter=""
+      data-read={entry.status === "read"}
+      style={{ "--feed": feedColor(entry.feedId), "--enter-i": enterIndex } as React.CSSProperties}
+      role="button"
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open(e);
+        }
+      }}
+    >
+      <div className="search-row__thumb" data-empty={entry.image ? undefined : ""}>
+        {entry.image && <MediaImg src={entry.image} />}
+      </div>
+      <div className="search-row__body">
+        <div className="search-row__source">{entry.feedTitle}</div>
+        <h3 className="search-row__title line-clamp-2">{entry.title}</h3>
+        <div className="search-row__meta">
+          <span>{relativeTime(entry.publishedAt)}</span>
+          {entry.readingTime > 0 && <span>· {entry.readingTime} min</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Search-results list: a single column of rows that cascade in. Replaces the
+// front-page (hero + masonry) layout while a query is active.
+function SearchResults({
+  entries,
+  onOpen,
+}: {
+  entries: CardEntry[];
+  onOpen: (e: CardEntry, originRect?: DOMRect) => void;
+}) {
+  return (
+    <div className="search-list">
+      {entries.map((e, i) => (
+        <SearchRow key={e.id} entry={e} onOpen={onOpen} enterIndex={Math.min(STAGGER_MAX, i)} />
+      ))}
+    </div>
+  );
+}
+
 function SkeletonStream() {
   return (
     <>
@@ -406,6 +470,8 @@ export function Stream({
             </div>
           </div>
         </div>
+      ) : searching ? (
+        <SearchResults entries={entries} onOpen={onOpen} />
       ) : (
         <>
           {briefs.length > 0 ? (

@@ -1456,10 +1456,12 @@
    fill, so the card returns to its natural transform afterwards and hover works.
    Cards mount async (SWR), so this is an animation, not a transition — it plays
    on mount whether or not the reveal flip already happened. */
+.stream[data-searching]:not([data-reveal]) .search-row[data-search-enter],
 .stream[data-searching]:not([data-reveal]) .card-slot[data-search-enter] > .card,
 .stream[data-searching]:not([data-reveal]) .brief[data-search-enter] {
   opacity: 0;
 }
+.stream[data-searching][data-reveal] .search-row[data-search-enter],
 .stream[data-searching][data-reveal] .card-slot[data-search-enter] > .card,
 .stream[data-searching][data-reveal] .brief[data-search-enter] {
   animation: search-card-enter 0.6s cubic-bezier(0.32, 0.72, 0, 1) backwards;
@@ -1476,18 +1478,103 @@
   }
 }
 
+/* The results list itself: a single narrow column of compact rows. */
+.search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 760px;
+}
+.search-row {
+  display: flex;
+  gap: 20px;
+  padding: 16px;
+  background: var(--card);
+  color: var(--card-foreground);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (hover: hover) {
+  .search-row:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+  }
+}
+.search-row[data-read="true"] {
+  opacity: 0.62;
+}
+.search-row__thumb {
+  width: 158px;
+  height: 110px;
+  flex: none;
+  border-radius: 12px;
+  overflow: hidden;
+  background: radial-gradient(120% 100% at 75% 15%, var(--feed) 0%, transparent 60%),
+    linear-gradient(150deg, var(--feed), #0a1a20);
+}
+.search-row__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.search-row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 2px 2px 2px 0;
+}
+.search-row__source {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--feed);
+}
+.search-row__title {
+  font-family: var(--font-serif-stack);
+  font-weight: 500;
+  font-size: 23px;
+  line-height: 1.24;
+  letter-spacing: -0.01em;
+  margin-top: 8px;
+  color: var(--card-foreground);
+}
+.search-row__meta {
+  margin-top: auto;
+  padding-top: 10px;
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+@media (max-width: 640px) {
+  .search-row__thumb {
+    width: 104px;
+    height: 84px;
+  }
+  .search-row__title {
+    font-size: 18px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stream[data-searching] .masthead__eyebrow,
   .stream[data-searching] .masthead__title,
   .stream[data-searching] .masthead__sub,
-  .stream[data-searching]:not([data-reveal]) .card-slot[data-search-enter] > .card,
-  .stream[data-searching]:not([data-reveal]) .brief[data-search-enter],
-  .stream[data-searching][data-reveal] .card-slot[data-search-enter] > .card,
-  .stream[data-searching][data-reveal] .brief[data-search-enter] {
+  .stream[data-searching] .search-row[data-search-enter],
+  .stream[data-searching] .card-slot[data-search-enter] > .card,
+  .stream[data-searching] .brief[data-search-enter] {
     opacity: 1;
     transform: none;
     animation: none;
     transition: none;
+  }
+  .stream[data-searching] .search-row[data-read="true"] {
+    opacity: 0.62;
   }
 }
 
