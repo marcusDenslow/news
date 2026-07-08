@@ -43,6 +43,12 @@ const VIRT_STEP = 500; // only recompute the visible set after scrolling this fa
 // animate in; already-seen cards don't re-animate on scroll-back.
 const revealedIds = new Set<number>();
 
+// Search-results entrance (design item 7): a coordinated cascade. Cards animate
+// in on a stagger that grows with reading order, capped so a large result set
+// doesn't trail on for seconds.
+const STAGGER_MAX = 10;
+const REVEAL_DELAY = 55; // ms: matches the design's sReveal retrigger
+
 // Column count + an explicit per-column width. The width is driven from React
 // state (not CSS flex), so on a resize/zoom the columns hold their old width
 // for one frame until we commit the new one — which lets Framer's `layout`
@@ -170,12 +176,27 @@ function masthead(filter: Filter, search: string) {
   return { eyebrow: eyebrows[filter.kind] ?? "", title: filter.label };
 }
 
-function Brief({ entry, onOpen }: { entry: CardEntry; onOpen: (e: CardEntry) => void }) {
+function Brief({
+  entry,
+  onOpen,
+  enterIndex,
+}: {
+  entry: CardEntry;
+  onOpen: (e: CardEntry) => void;
+  enterIndex?: number;
+}) {
   const open = () => onOpen(entry);
+  const searchEnter = enterIndex != null;
   return (
     <div
       className="brief"
-      style={{ "--feed": feedColor(entry.feedId) } as React.CSSProperties}
+      style={
+        {
+          "--feed": feedColor(entry.feedId),
+          ...(searchEnter ? { "--enter-i": enterIndex } : {}),
+        } as React.CSSProperties
+      }
+      data-search-enter={searchEnter ? "" : undefined}
       data-read={entry.status === "read"}
       role="button"
       tabIndex={0}
@@ -268,12 +289,36 @@ export function Stream({
   const streamRef = useRef<HTMLDivElement>(null);
   const { cols, width: colWidth, inner } = useGrid(streamRef);
 
+  // Search entrance: the feed cross-fades back, then the query masthead lifts in
+  // and the result cards cascade up. `reveal` gates it, and is retriggered off a
+  // brief false→true flip on each new query so re-searching replays the settle.
+  const query = search.trim();
+  const searching = query.length > 0;
+  const [reveal, setReveal] = useState(false);
+  useEffect(() => {
+    if (!searching) {
+      setReveal(false);
+      return;
+    }
+    setReveal(false);
+    const t = setTimeout(() => setReveal(true), REVEAL_DELAY);
+    return () => clearTimeout(t);
+  }, [query, searching]);
+
   // The lead is now a carousel over the top few stories; the Latest rail and the
   // flow pick up after it so nothing shows twice.
   const heroPool = useMemo(() => entries.slice(0, 5), [entries]);
   const briefs = entries.slice(5, 9);
   const flow = useMemo(() => entries.slice(9), [entries]);
   const { pos, height: flowHeight, onHeight } = useMasonryLayout(flow, cols, colWidth);
+
+  // Reading-order index per flow card, for the search cascade stagger. Briefs
+  // take the first slots, so the flow continues after them.
+  const flowOrder = useMemo(() => {
+    const m = new Map<number, number>();
+    flow.forEach((e, i) => m.set(e.id, i));
+    return m;
+  }, [flow]);
 
   // Virtualization: track the flow's position in the viewport and render only
   // the cards near it. Positions for all cards are still computed (cheap, O(n)),
@@ -317,7 +362,12 @@ export function Stream({
   const briefsW = stacked ? inner : Math.max(0, inner - FRONT_GAP - heroW);
 
   return (
-    <div className="stream" ref={streamRef}>
+    <div
+      className="stream"
+      ref={streamRef}
+      data-searching={searching ? "" : undefined}
+      data-reveal={reveal ? "" : undefined}
+    >
       <header className="masthead">
         <div className="masthead__eyebrow" suppressHydrationWarning>
           {eyebrow}
@@ -368,8 +418,13 @@ export function Stream({
                   <span className="briefs__pulse" />
                   Latest
                 </div>
-                {briefs.map((e) => (
-                  <Brief key={e.id} entry={e} onOpen={onOpen} />
+                {briefs.map((e, i) => (
+                  <Brief
+                    key={e.id}
+                    entry={e}
+                    onOpen={onOpen}
+                    enterIndex={searching ? i : undefined}
+                  />
                 ))}
               </div>
             </div>
@@ -385,6 +440,9 @@ export function Stream({
             <div className="flow" ref={flowRef} style={{ height: flowHeight }}>
               {visibleFlow.map((entry) => {
                 const p = pos.get(entry.id) ?? { x: 0, y: 0, h: 0 };
+                const enterIndex = searching
+                  ? Math.min(STAGGER_MAX, briefs.length + (flowOrder.get(entry.id) ?? 0))
+                  : undefined;
                 return (
                   <Card
                     key={entry.id}
@@ -396,6 +454,7 @@ export function Stream({
                     onToggleStar={onToggleStar}
                     onHeight={onHeight}
                     revealed={revealedIds}
+                    enterIndex={enterIndex}
                   />
                 );
               })}

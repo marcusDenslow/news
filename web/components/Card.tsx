@@ -18,6 +18,10 @@ interface CardProps {
   onToggleStar: (entry: CardEntry) => void;
   onHeight: (id: number, h: number) => void;
   revealed: Set<number>; // ids that have already played their entrance
+  // Search-results mode: when set, the card skips the scroll-triggered entrance
+  // and instead plays a coordinated staggered cascade (delay grows with index),
+  // driven by the .stream[data-reveal] gate. Undefined for normal browsing.
+  enterIndex?: number;
 }
 
 function activateOnKey(handler: (e: React.KeyboardEvent) => void) {
@@ -46,8 +50,10 @@ export const Card = memo(function Card({
   onToggleStar,
   onHeight,
   revealed,
+  enterIndex,
 }: CardProps) {
   const hasImage = Boolean(entry.image);
+  const searchEnter = enterIndex != null;
   const ref = useRef<HTMLElement>(null);
   const open = (e: React.MouseEvent | React.KeyboardEvent) =>
     onOpen(entry, rectOf(e.currentTarget, ".card__media"));
@@ -62,6 +68,10 @@ export const Card = memo(function Card({
   const [phase, setPhase] = useState<"seen" | "pending" | "enter">(() =>
     revealed.has(entry.id) ? "seen" : "pending"
   );
+  // In search mode the cascade owns the entrance, so the scroll-phase machinery
+  // stands down ("seen" = plain visible; the .card-slot[data-search-enter] rule
+  // supplies the animation instead).
+  const effectivePhase = searchEnter ? "seen" : phase;
 
   // Report rendered height so the masonry can stack columns; re-fires when the
   // title rewraps at a new width (ResizeObserver).
@@ -77,7 +87,7 @@ export const Card = memo(function Card({
 
   // Fire the entrance the first time the card scrolls into view.
   useEffect(() => {
-    if (phase !== "pending") return;
+    if (searchEnter || phase !== "pending") return;
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -99,8 +109,15 @@ export const Card = memo(function Card({
     // its new spot on reflow — no per-card animation runtime, no GPU-layer spam.
     <div
       className="card-slot"
-      data-phase={phase}
-      style={{ width, transform: `translate(${x}px, ${y}px)` }}
+      data-phase={effectivePhase}
+      data-search-enter={searchEnter ? "" : undefined}
+      style={
+        {
+          width,
+          transform: `translate(${x}px, ${y}px)`,
+          ...(searchEnter ? { "--enter-i": enterIndex } : {}),
+        } as React.CSSProperties
+      }
     >
       <article
         ref={ref}

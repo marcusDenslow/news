@@ -1411,6 +1411,86 @@
   }
 }
 
+/* ===================================================================== */
+/*  Search-results entrance (design item 7)                              */
+/*  The query masthead lifts + settles, then result cards cascade up on  */
+/*  a staggered ease-out. Gated by .stream[data-searching][data-reveal]  */
+/*  so normal browsing is untouched. Ease + timings from the design.     */
+/* ===================================================================== */
+
+/* Masthead lifts in: eyebrow, then the query title, then the count. */
+.stream[data-searching] .masthead__eyebrow {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+.stream[data-searching] .masthead__title {
+  opacity: 0;
+  transform: translateY(16px) scale(0.96);
+  transform-origin: left center;
+}
+.stream[data-searching] .masthead__sub {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.stream[data-searching][data-reveal] .masthead__eyebrow {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.5s cubic-bezier(0.32, 0.72, 0, 1) 0.05s,
+    transform 0.5s cubic-bezier(0.32, 0.72, 0, 1) 0.05s;
+}
+.stream[data-searching][data-reveal] .masthead__title {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.6s cubic-bezier(0.32, 0.72, 0, 1) 0.1s,
+    transform 0.6s cubic-bezier(0.32, 0.72, 0, 1) 0.1s;
+}
+.stream[data-searching][data-reveal] .masthead__sub {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.5s cubic-bezier(0.32, 0.72, 0, 1) 0.2s,
+    transform 0.5s cubic-bezier(0.32, 0.72, 0, 1) 0.2s;
+}
+
+/* Result cards + briefs: held hidden pre-reveal, then rise/fade in on a
+   per-item stagger. `backwards` fill hides them through the delay; no forwards
+   fill, so the card returns to its natural transform afterwards and hover works.
+   Cards mount async (SWR), so this is an animation, not a transition — it plays
+   on mount whether or not the reveal flip already happened. */
+.stream[data-searching]:not([data-reveal]) .card-slot[data-search-enter] > .card,
+.stream[data-searching]:not([data-reveal]) .brief[data-search-enter] {
+  opacity: 0;
+}
+.stream[data-searching][data-reveal] .card-slot[data-search-enter] > .card,
+.stream[data-searching][data-reveal] .brief[data-search-enter] {
+  animation: search-card-enter 0.6s cubic-bezier(0.32, 0.72, 0, 1) backwards;
+  animation-delay: calc(0.24s + var(--enter-i, 0) * 0.075s);
+}
+@keyframes search-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream[data-searching] .masthead__eyebrow,
+  .stream[data-searching] .masthead__title,
+  .stream[data-searching] .masthead__sub,
+  .stream[data-searching]:not([data-reveal]) .card-slot[data-search-enter] > .card,
+  .stream[data-searching]:not([data-reveal]) .brief[data-search-enter],
+  .stream[data-searching][data-reveal] .card-slot[data-search-enter] > .card,
+  .stream[data-searching][data-reveal] .brief[data-search-enter] {
+    opacity: 1;
+    transform: none;
+    animation: none;
+    transition: none;
+  }
+}
+
 /* Skeleton keeps a simple flex grid (no measured heights to animate). */
 .flow-skeleton {
   display: flex;
