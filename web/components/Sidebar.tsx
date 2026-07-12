@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
+import { runThemeTransition } from "@/lib/themeTransition";
 import {
   CircleDot,
   Bookmark,
@@ -77,14 +78,31 @@ function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const isDark = resolvedTheme === "dark";
+
+  const toggle = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const next = isDark ? "light" : "dark";
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Sweep originates at the icon's exact center.
+    runThemeTransition(
+      { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
+      () => {
+        // Flip the class inside the view-transition callback so the "new"
+        // snapshot already carries the target theme; setTheme then persists it
+        // and keeps next-themes in sync.
+        document.documentElement.classList.toggle("dark", next === "dark");
+        setTheme(next);
+      }
+    );
+  };
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full"
-          onClick={() => setTheme(isDark ? "light" : "dark")}
+          className="theme-toggle-btn rounded-full"
+          onClick={toggle}
           aria-label="Toggle theme"
         >
           {mounted && isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}

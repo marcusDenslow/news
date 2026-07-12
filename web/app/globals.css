@@ -2855,3 +2855,32 @@
   font-size: 12.5px;
   color: rgba(240, 237, 230, 0.3);
 }
+
+/* ===================================================================== */
+/*  Design 8 — theme toggle sweep                                        */
+/* ===================================================================== */
+/* The new theme wipes over the old from the toggle icon (see
+   lib/themeTransition.ts). Kill the browser's default cross-fade so the two
+   themes never blend — the old snapshot holds full and opaque underneath while
+   a clip-path circle grows the new one over it in a single clean sweep. */
+::view-transition-group(root) {
+  animation-duration: 0.62s;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  z-index: 1;
+}
+::view-transition-old(root) {
+  z-index: 0;
+}
+
+.theme-toggle-btn {
+  transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.theme-toggle-btn:hover {
+  transform: scale(1.08);
+}
