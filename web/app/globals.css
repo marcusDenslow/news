@@ -45,8 +45,8 @@
 }
 
 :root {
-  /* Soft cool paper, ink text, warm editorial accent */
-  --background: oklch(0.955 0.004 270);
+  /* Pure white paper, ink text, warm editorial accent */
+  --background: oklch(1 0 0);
   --foreground: oklch(0.205 0.012 300);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.205 0.012 300);
