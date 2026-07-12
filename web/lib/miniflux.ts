@@ -191,7 +191,9 @@ export interface ListParams {
 
 function entriesPath(p: ListParams): string {
   const qs = new URLSearchParams({
-    order: "published_at",
+    // Saved view sorts by most-recently-starred. Miniflux has no starred_at, but
+    // starring bumps changed_at, so changed_at desc surfaces latest-added first.
+    order: p.starred ? "changed_at" : "published_at",
     direction: "desc",
     limit: String(p.limit ?? 30),
     offset: String(p.offset ?? 0),

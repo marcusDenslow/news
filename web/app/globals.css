@@ -1550,9 +1550,6 @@
     box-shadow: var(--shadow-card-hover);
   }
 }
-.search-row[data-read="true"] {
-  opacity: 0.62;
-}
 .search-row__thumb {
   width: 158px;
   height: 110px;
@@ -1619,9 +1616,6 @@
     transform: none;
     animation: none;
     transition: none;
-  }
-  .stream[data-searching] .search-row[data-read="true"] {
-    opacity: 0.62;
   }
 }
 
