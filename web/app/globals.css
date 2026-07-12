@@ -1793,8 +1793,8 @@
   left: 0;
   z-index: 60;
   /* Matches the cinematic reader surface so the covered feed reads as one sheet
-     — warm paper in light mode, near-black in dark. */
-  background: #f6f3ec;
+     — white in light mode, near-black in dark. */
+  background: #ffffff;
 }
 .dark .reader-backdrop {
   background: #0b0b0d;
@@ -2199,7 +2199,7 @@
   /* Theme-aware page surface. Light is the default; .dark flips it below, so a
      light-mode feed opens a warm-paper cinematic reader and a dark feed opens
      the dark theater. */
-  --cine-bg: #f6f3ec;
+  --cine-bg: #ffffff;
   --cine-title: #1b160f;
   --cine-body: rgba(38, 32, 24, 0.9);
   --cine-muted: rgba(38, 32, 24, 0.55);
