@@ -234,7 +234,38 @@
 
 /* ----- Masthead ----- */
 .masthead {
+  position: relative;
   padding: 34px 4px 26px;
+}
+
+/* Saved-tab layout switch (list ⇄ cards), pinned to the masthead's top-right. */
+.saved-toggle {
+  position: absolute;
+  top: 36px;
+  right: 4px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+.saved-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--muted-foreground);
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.saved-toggle__btn:hover {
+  color: var(--foreground);
+}
+.saved-toggle__btn[data-active="true"] {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--shadow-card);
 }
 .masthead__eyebrow {
   display: inline-flex;
@@ -1500,7 +1531,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 760px;
 }
 .search-row {
   display: flex;

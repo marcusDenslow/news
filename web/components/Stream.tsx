@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Loader2, Inbox, AlertCircle, Check } from "lucide-react";
+import { Loader2, Inbox, AlertCircle, Check, List, LayoutGrid } from "lucide-react";
 import type { CardEntry, Filter } from "@/lib/types";
 import { Card, HeroCarousel } from "@/components/Card";
 import { MediaImg } from "@/components/Img";
@@ -353,6 +353,28 @@ export function Stream({
   const streamRef = useRef<HTMLDivElement>(null);
   const { cols, width: colWidth, inner } = useGrid(streamRef);
 
+  const isSaved = filter.kind === "starred";
+  // Saved tab shows a full-width list by default (like search results); a toggle
+  // switches to a plain card grid — no lead carousel, no "Latest" rail, just the
+  // cards. The choice is remembered across sessions.
+  // Safe to read storage in the initializer: the first filter is Today, so the
+  // saved view never renders on the server/first paint — no hydration mismatch.
+  const [savedView, setSavedView] = useState<"list" | "cards">(() =>
+    typeof window !== "undefined" && localStorage.getItem("savedView") === "cards"
+      ? "cards"
+      : "list"
+  );
+  const chooseSavedView = useCallback((v: "list" | "cards") => {
+    setSavedView(v);
+    try {
+      localStorage.setItem("savedView", v);
+    } catch {
+      /* private mode — the in-memory choice still holds for the session */
+    }
+  }, []);
+  const savedCards = isSaved && savedView === "cards";
+  const savedList = isSaved && savedView === "list";
+
   // Search entrance, two modes so refining a query doesn't replay the whole show:
   //   enter  – first keystroke into search: masthead lifts in + cards cascade.
   //   update – subsequent keystrokes: a quick, near-uniform list settle only.
@@ -381,8 +403,9 @@ export function Stream({
   // The lead is now a carousel over the top few stories; the Latest rail and the
   // flow pick up after it so nothing shows twice.
   const heroPool = useMemo(() => entries.slice(0, 5), [entries]);
-  const briefs = entries.slice(5, 9);
-  const flow = useMemo(() => entries.slice(9), [entries]);
+  const briefs = savedCards ? [] : entries.slice(5, 9);
+  // Card grid on the Saved tab spans every entry (no hero/Latest split off the top).
+  const flow = useMemo(() => (savedCards ? entries : entries.slice(9)), [entries, savedCards]);
   const { pos, height: flowHeight, onHeight } = useMasonryLayout(flow, cols, colWidth);
 
   // Reading-order index per flow card, for the search cascade stagger. Briefs
@@ -452,6 +475,30 @@ export function Stream({
             {total.toLocaleString()} {total === 1 ? "story" : "stories"}
           </div>
         )}
+        {isSaved && !searching && !isLoadingInitial && !error && !isEmpty && (
+          <div className="saved-toggle" role="group" aria-label="Layout">
+            <button
+              type="button"
+              className="saved-toggle__btn"
+              data-active={savedView === "list"}
+              aria-pressed={savedView === "list"}
+              aria-label="List view"
+              onClick={() => chooseSavedView("list")}
+            >
+              <List size={16} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              className="saved-toggle__btn"
+              data-active={savedView === "cards"}
+              aria-pressed={savedView === "cards"}
+              aria-label="Card view"
+              onClick={() => chooseSavedView("cards")}
+            >
+              <LayoutGrid size={16} strokeWidth={2} />
+            </button>
+          </div>
+        )}
       </header>
 
       {isLoadingInitial ? (
@@ -480,37 +527,38 @@ export function Stream({
             </div>
           </div>
         </div>
-      ) : searching ? (
+      ) : searching || savedList ? (
         <SearchResults entries={entries} onOpen={onOpen} />
       ) : (
         <>
-          {briefs.length > 0 ? (
-            <div className="frontpage" data-stacked={stacked}>
-              <div className="frontpage__col" style={{ width: heroW }}>
-                <HeroCarousel entries={heroPool} onOpen={onOpen} />
-              </div>
-              <div className="briefs" style={{ width: briefsW }}>
-                <div className="briefs__head">
-                  <span className="briefs__pulse" />
-                  Latest
+          {!savedCards &&
+            (briefs.length > 0 ? (
+              <div className="frontpage" data-stacked={stacked}>
+                <div className="frontpage__col" style={{ width: heroW }}>
+                  <HeroCarousel entries={heroPool} onOpen={onOpen} />
                 </div>
-                {briefs.map((e, i) => (
-                  <Brief
-                    key={e.id}
-                    entry={e}
-                    onOpen={onOpen}
-                    enterIndex={searching ? i : undefined}
-                  />
-                ))}
+                <div className="briefs" style={{ width: briefsW }}>
+                  <div className="briefs__head">
+                    <span className="briefs__pulse" />
+                    Latest
+                  </div>
+                  {briefs.map((e, i) => (
+                    <Brief
+                      key={e.id}
+                      entry={e}
+                      onOpen={onOpen}
+                      enterIndex={searching ? i : undefined}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
-            heroPool.length > 0 && (
-              <div style={{ marginBottom: 24 }}>
-                <HeroCarousel entries={heroPool} onOpen={onOpen} />
-              </div>
-            )
-          )}
+            ) : (
+              heroPool.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <HeroCarousel entries={heroPool} onOpen={onOpen} />
+                </div>
+              )
+            ))}
 
           {flow.length > 0 && (
             <div className="flow" ref={flowRef} style={{ height: flowHeight }}>

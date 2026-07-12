@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import useSWRInfinite from "swr/infinite";
 import { AnimatePresence } from "motion/react";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ type Page = { total: number; entries: CardEntry[] };
 
 export function App({ username }: { username?: string }) {
   const router = useRouter();
+  const { mutate: globalMutate } = useSWRConfig();
   const [filter, setFilter] = useState<Filter>({ kind: "today", label: "Today" });
   const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -86,9 +87,12 @@ export function App({ username }: { username?: string }) {
   const isReachingEnd =
     isEmpty || (!!data && (data[data.length - 1]?.entries.length ?? 0) < PAGE);
 
-  // Reset paging + scroll when the query changes.
+  // Reset paging + scroll when the query changes. Revalidate too: focus/interval
+  // revalidation is off for perf, so without this a tab kept its stale cache —
+  // e.g. Saved wouldn't pick up stars added from other views until a full reload.
   useEffect(() => {
     setSize(1);
+    mutate();
     window.scrollTo({ top: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, search]);
@@ -161,10 +165,14 @@ export function App({ username }: { username?: string }) {
         if (starred) toast.success("Bookmarked");
       } catch {
         mutate();
+        return;
       }
-      if (filter.kind === "starred" && !starred) mutate();
+      // Membership of the Saved view changed. Revalidate every cached Saved query
+      // (this view or a background one) so a star added/removed anywhere shows up
+      // there without a page reload.
+      globalMutate((key) => typeof key === "string" && key.includes("starred=true"));
     },
-    [patchEntry, mutate, mutateTree, filter.kind]
+    [patchEntry, mutate, mutateTree, globalMutate]
   );
 
   /* ---- reader open/close with history ---- */
